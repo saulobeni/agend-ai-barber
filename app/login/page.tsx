@@ -6,16 +6,25 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { login } from "@/app/actions/auth"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [senha, setSenha] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // Simula login - em produção conectaria com backend
-    router.push("/")
+    setError("")
+    setLoading(true)
+    
+    const formData = new FormData(e.currentTarget)
+    const result = await login(formData)
+    
+    if (result?.error) {
+      setError(result.error)
+      setLoading(false)
+    }
   }
 
   return (
@@ -38,6 +47,12 @@ export default function LoginPage() {
             Entre na sua conta para agendar
           </p>
 
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-3 mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-foreground">
@@ -45,33 +60,34 @@ export default function LoginPage() {
               </label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                required
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="senha" className="text-sm font-medium text-foreground">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Senha
               </label>
               <Input
-                id="senha"
+                id="password"
+                name="password"
                 type="password"
                 placeholder="********"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                required
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <Button 
               type="submit" 
+              disabled={loading}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3"
             >
-              Entrar
+              {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 

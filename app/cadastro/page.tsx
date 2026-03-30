@@ -6,18 +6,27 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { signup } from "@/app/actions/auth"
 
 export default function CadastroPage() {
-  const [nome, setNome] = useState("")
-  const [email, setEmail] = useState("")
-  const [telefone, setTelefone] = useState("")
-  const [senha, setSenha] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // Simula cadastro - em produção conectaria com backend
-    router.push("/")
+    setError("")
+    setLoading(true)
+    
+    const formData = new FormData(e.currentTarget)
+    const result = await signup(formData)
+    
+    if (result?.error) {
+      setError(result.error)
+      setLoading(false)
+    } else if (result?.success) {
+      router.push("/cadastro/sucesso")
+    }
   }
 
   return (
@@ -40,17 +49,23 @@ export default function CadastroPage() {
             Crie sua conta para agendar
           </p>
 
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-3 mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="nome" className="text-sm font-medium text-foreground">
+              <label htmlFor="fullName" className="text-sm font-medium text-foreground">
                 Nome completo
               </label>
               <Input
-                id="nome"
+                id="fullName"
+                name="fullName"
                 type="text"
                 placeholder="Seu nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                required
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -61,47 +76,48 @@ export default function CadastroPage() {
               </label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                required
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="telefone" className="text-sm font-medium text-foreground">
+              <label htmlFor="phone" className="text-sm font-medium text-foreground">
                 Telefone
               </label>
               <Input
-                id="telefone"
+                id="phone"
+                name="phone"
                 type="tel"
                 placeholder="(00) 00000-0000"
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="senha" className="text-sm font-medium text-foreground">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Senha
               </label>
               <Input
-                id="senha"
+                id="password"
+                name="password"
                 type="password"
                 placeholder="********"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                required
+                minLength={6}
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <Button 
-              type="submit" 
+              type="submit"
+              disabled={loading}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3"
             >
-              Criar conta
+              {loading ? "Criando conta..." : "Criar conta"}
             </Button>
           </form>
 
