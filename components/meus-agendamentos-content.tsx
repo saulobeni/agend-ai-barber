@@ -13,10 +13,9 @@ interface MeusAgendamentosContentProps {
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
-  pending: { label: "Pendente", className: "bg-yellow-500/10 text-yellow-500" },
-  confirmed: { label: "Confirmado", className: "bg-green-500/10 text-green-500" },
+  scheduled: { label: "Agendado", className: "bg-yellow-500/10 text-yellow-500" },
   completed: { label: "Concluído", className: "bg-blue-500/10 text-blue-500" },
-  cancelled: { label: "Cancelado", className: "bg-red-500/10 text-red-500" },
+  canceled: { label: "Cancelado", className: "bg-red-500/10 text-red-500" },
 }
 
 function formatDate(dateStr: string): string {
@@ -43,7 +42,7 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
       setLocalAppointments(prev => 
         prev.map(apt => 
           apt.id === appointmentId 
-            ? { ...apt, status: 'cancelled' as const } 
+            ? { ...apt, status: 'canceled' as const } 
             : apt
         )
       )
@@ -52,11 +51,11 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
   }
 
   const upcomingAppointments = localAppointments.filter(
-    apt => apt.status === 'pending' || apt.status === 'confirmed'
+    apt => apt.status === 'scheduled'
   )
   
   const pastAppointments = localAppointments.filter(
-    apt => apt.status === 'completed' || apt.status === 'cancelled'
+    apt => apt.status === 'completed' || apt.status === 'canceled'
   )
 
   return (
@@ -118,7 +117,7 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              <span>{appointment.start_time.slice(0, 5)}</span>
+                              <span>{appointment.appointment_time.slice(0, 5)}</span>
                             </div>
                           </div>
                           
@@ -127,7 +126,7 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
                           </p>
                         </div>
                         
-                        {appointment.status !== 'cancelled' && (
+                        {appointment.status === 'scheduled' && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -172,7 +171,7 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            <span>{appointment.start_time.slice(0, 5)}</span>
+                            <span>{appointment.appointment_time.slice(0, 5)}</span>
                           </div>
                         </div>
                       </div>

@@ -204,7 +204,7 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
                           : "bg-secondary text-foreground hover:bg-secondary/80"}
                       `}
                     >
-                      {barber.profile?.full_name || "Barbeiro"}
+                      {barber.name || "Barbeiro"}
                     </button>
                   ))}
                 </div>

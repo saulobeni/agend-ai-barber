@@ -80,60 +80,71 @@ export function DashboardContent({ services, nextAppointment, userEmail }: Dashb
         </section>
 
         {/* Próximo Agendamento */}
-        {nextAppointment && (
-          <Card className="bg-card border-border p-4 mb-8">
-            <div className="flex items-center gap-2 text-primary mb-2">
-              <Calendar className="h-4 w-4" />
-              <span className="font-medium">Próximo Agendamento</span>
-            </div>
-            <div className="flex items-center gap-4 text-muted-foreground">
+        <Card className="bg-card border-border p-4 mb-8">
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <Calendar className="h-4 w-4" />
+            <span className="font-medium">Próximo Agendamento</span>
+          </div>
+
+          {nextAppointment ? (
+            <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 <span>{formatDate(nextAppointment.appointment_date)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                <span>{nextAppointment.start_time.slice(0, 5)}</span>
+                <span>{nextAppointment.appointment_time.slice(0, 5)}</span>
               </div>
               <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
                 {nextAppointment.service?.name || 'Serviço'}
               </span>
             </div>
-          </Card>
-        )}
+          ) : (
+            <div className="text-muted-foreground text-sm">
+              Nenhum agendamento futuro encontrado.
+            </div>
+          )}
+        </Card>
 
         {/* Serviços */}
         <section>
           <h3 className="text-xl font-semibold text-foreground mb-4">Nossos Serviços</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {services.map((service) => (
-              <Card key={service.id} className="bg-card border-border p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{serviceIcons[service.name] || '💈'}</span>
-                  <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
-                    {formatDuration(service.duration_minutes)}
-                  </span>
-                </div>
-                
-                <h4 className="text-lg font-semibold text-foreground mb-2">{service.name}</h4>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {service.description || 'Serviço de barbearia profissional.'}
-                </p>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-bold text-primary">
-                    {formatPrice(service.price)}
-                  </span>
-                  <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                    <Link href={`/agendar/${service.name.toLowerCase()}`}>
-                      Agendar Agora
-                    </Link>
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+          {services.length === 0 ? (
+            <div className="text-muted-foreground text-sm">
+              Nenhum serviço encontrado para sua barbearia.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {services.map((service) => (
+                <Card key={service.id} className="bg-card border-border p-6">
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="text-2xl">{serviceIcons[service.name] || '💈'}</span>
+                    <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
+                      {formatDuration(service.duration_minutes)}
+                    </span>
+                  </div>
+                  
+                  <h4 className="text-lg font-semibold text-foreground mb-2">{service.name}</h4>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    {service.description || 'Serviço de barbearia profissional.'}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-bold text-primary">
+                      {formatPrice(service.price)}
+                    </span>
+                    <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                      <Link href={`/agendar/${service.name.toLowerCase()}`}>
+                        Agendar Agora
+                      </Link>
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

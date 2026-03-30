@@ -1,19 +1,18 @@
+// Types alinhados ao SQL em `scripts/001_create_schema.sql`
+// (seu esquema usa: `appointment_time`, `block_date`, status `scheduled/completed/canceled`, etc.)
+
 export interface Profile {
   id: string
+  username: string | null
   full_name: string | null
-  phone: string | null
-  avatar_url: string | null
-  role: 'client' | 'barber' | 'admin'
   created_at: string
-  updated_at: string
 }
 
 export interface Barbershop {
   id: string
+  owner_id: string | null
   name: string
   address: string | null
-  phone: string | null
-  logo_url: string | null
   opening_time: string
   closing_time: string
   created_at: string
@@ -21,20 +20,17 @@ export interface Barbershop {
 
 export interface Client {
   id: string
-  user_id: string
   barbershop_id: string
-  notes: string | null
+  name: string
+  phone: string
   created_at: string
 }
 
 export interface Barber {
   id: string
-  user_id: string
   barbershop_id: string
-  specialty: string | null
-  is_active: boolean
+  name: string
   created_at: string
-  profile?: Profile
 }
 
 export interface Service {
@@ -42,47 +38,45 @@ export interface Service {
   barbershop_id: string
   name: string
   description: string | null
-  duration_minutes: number
   price: number
-  icon: string | null
-  is_active: boolean
+  duration_minutes: number
   created_at: string
 }
+
+export type AppointmentStatus = 'scheduled' | 'completed' | 'canceled'
 
 export interface Appointment {
   id: string
   client_id: string
-  barber_id: string
   service_id: string
+  barber_id: string
   barbershop_id: string
   appointment_date: string
-  start_time: string
-  end_time: string
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
-  notes: string | null
+  appointment_time: string
+  status: AppointmentStatus
+  cancel_token: string
   created_at: string
-  updated_at: string
   service?: Service
-  barber?: Barber & { profile?: Profile }
+  barber?: Barber
 }
 
 export interface BlockedTime {
   id: string
   barber_id: string
-  barbershop_id: string
-  blocked_date: string
+  block_date: string
   start_time: string
   end_time: string
   reason: string | null
   created_at: string
 }
 
+export type PaymentMethod = 'cash' | 'pix' | 'card'
+
 export interface Payment {
   id: string
   appointment_id: string
   amount: number
-  payment_method: 'cash' | 'credit_card' | 'debit_card' | 'pix'
-  status: 'pending' | 'paid' | 'refunded'
+  method: PaymentMethod
   paid_at: string | null
   created_at: string
 }

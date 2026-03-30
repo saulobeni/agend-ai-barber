@@ -4,17 +4,57 @@ import { createClient } from '@/lib/supabase/server'
 import type { Appointment, Barber } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 
-export async function getAvailableBarbers(): Promise<Barber[]> {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase
-    .from('barbers')
-    .select(`
-      *,
-      profile:profiles(*)
-    `)
-    .eq('is_active', true)
+function parseTimeToMinutes(time: string): number {
+  // Supabase often returns TIME as `HH:MM:SS`, but we also accept `HH:MM`.
+  const parts = time.split(':')
+  const hh = Number(parts[0] ?? 0)
+  const mm = Number(parts[1] ?? 0)
+  return hh * 60 + mm
+}
 
+function minutesToTimeString(totalMinutes: number): string {
+  const hh = Math.floor(totalMinutes / 60).toString().padStart(2, '0')
+  const mm = (totalMinutes % 60).toString().padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+async function getOwnedBarbershopIds(): Promise<string[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return []
+
+  const { data: owned } = await supabase
+    .from('barbershops')
+    .select('id')
+    .eq('owner_id', user.id)
+
+  const ids = (owned || []).map((s) => s.id)
+  if (ids.length > 0) return ids
+
+  // Fallback: pega qualquer barbearia pública (ex.: demo com owner_id nulo)
+  const { data: anyShop } = await supabase.from('barbershops').select('id').limit(1)
+  return (anyShop || []).map((s) => s.id)
+}
+
+export async function getAvailableBarbers(barbershopId?: string): Promise<Barber[]> {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from('barbers')
+    .select('id, barbershop_id, name, created_at')
+    .order('created_at', { ascending: true })
+
+  if (barbershopId) {
+    query = query.eq('barbershop_id', barbershopId)
+  } else {
+    const ownedIds = await getOwnedBarbershopIds()
+    if (ownedIds.length > 0) query = query.in('barbershop_id', ownedIds)
+  }
+
+  const { data, error } = await query
   if (error) {
     console.error('Error fetching barbers:', error)
     return []
@@ -29,55 +69,83 @@ export async function getAvailableTimes(
   serviceDuration: number
 ): Promise<string[]> {
   const supabase = await createClient()
-  
-  // Buscar horários já agendados para o barbeiro nessa data
-  const { data: appointments } = await supabase
-    .from('appointments')
-    .select('start_time, end_time')
-    .eq('barber_id', barberId)
-    .eq('appointment_date', date)
-    .in('status', ['pending', 'confirmed'])
 
-  // Buscar bloqueios do barbeiro
-  const { data: blockedTimes } = await supabase
+  const { data: barber, error: barberError } = await supabase
+    .from('barbers')
+    .select('barbershop_id')
+    .eq('id', barberId)
+    .single()
+
+  if (barberError || !barber) return []
+
+  const { data: shop, error: shopError } = await supabase
+    .from('barbershops')
+    .select('opening_time, closing_time')
+    .eq('id', barber.barbershop_id)
+    .single()
+
+  if (shopError || !shop) return []
+
+  const openingMinutes = parseTimeToMinutes(shop.opening_time)
+  const closingMinutes = parseTimeToMinutes(shop.closing_time)
+
+  const stepMinutes = 15 // intervalos menores evitam sobreposição por duração
+
+  const { data: blockedTimes, error: blockedError } = await supabase
     .from('blocked_times')
     .select('start_time, end_time')
     .eq('barber_id', barberId)
-    .eq('blocked_date', date)
+    .eq('block_date', date)
 
-  // Horários de funcionamento (9h às 19h)
-  const openingHour = 9
-  const closingHour = 19
-  const slotDuration = 60 // slots de 1 hora
-  
-  const availableTimes: string[] = []
-  
-  for (let hour = openingHour; hour < closingHour; hour++) {
-    const timeStr = `${hour.toString().padStart(2, '0')}:00`
-    const endHour = hour + Math.ceil(serviceDuration / 60)
-    
-    // Verificar se o horário não está ocupado
-    const isBooked = appointments?.some(apt => {
-      const aptStart = parseInt(apt.start_time.split(':')[0])
-      const aptEnd = parseInt(apt.end_time.split(':')[0])
-      return hour >= aptStart && hour < aptEnd
-    })
-    
-    // Verificar se não está bloqueado
-    const isBlocked = blockedTimes?.some(bt => {
-      const btStart = parseInt(bt.start_time.split(':')[0])
-      const btEnd = parseInt(bt.end_time.split(':')[0])
-      return hour >= btStart && hour < btEnd
-    })
-    
-    // Verificar se cabe no horário de funcionamento
-    const fitsInSchedule = endHour <= closingHour
-    
-    if (!isBooked && !isBlocked && fitsInSchedule) {
-      availableTimes.push(timeStr)
-    }
+  if (blockedError) {
+    console.error('Error fetching blocked times:', blockedError)
   }
-  
+
+  // Buscar agendamentos marcados (para o overlap respeitar duration do serviço)
+  const { data: appointments, error: appointmentsError } = await supabase
+    .from('appointments')
+    .select(`
+      appointment_time,
+      service:services(duration_minutes)
+    `)
+    .eq('barber_id', barberId)
+    .eq('appointment_date', date)
+    .eq('status', 'scheduled')
+
+  if (appointmentsError) {
+    console.error('Error fetching appointments:', appointmentsError)
+    return []
+  }
+
+  const availableTimes: string[] = []
+
+  for (
+    let slotStartMin = openingMinutes;
+    slotStartMin + serviceDuration <= closingMinutes;
+    slotStartMin += stepMinutes
+  ) {
+    const slotEndMin = slotStartMin + serviceDuration
+
+    const isBooked = (appointments || []).some((apt: any) => {
+      const aptStartMin = parseTimeToMinutes(String(apt.appointment_time))
+      const duration = Number(apt?.service?.duration_minutes ?? serviceDuration)
+      const aptEndMin = aptStartMin + duration
+      return slotStartMin < aptEndMin && slotEndMin > aptStartMin
+    })
+
+    if (isBooked) continue
+
+    const isBlocked = (blockedTimes || []).some((bt: any) => {
+      const btStartMin = parseTimeToMinutes(String(bt.start_time))
+      const btEndMin = parseTimeToMinutes(String(bt.end_time))
+      return slotStartMin < btEndMin && slotEndMin > btStartMin
+    })
+
+    if (isBlocked) continue
+
+    availableTimes.push(minutesToTimeString(slotStartMin))
+  }
+
   return availableTimes
 }
 
@@ -89,143 +157,134 @@ export async function createAppointment(data: {
   duration: number
 }): Promise<{ success: boolean; error?: string; appointmentId?: string }> {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    return { success: false, error: 'Usuário não autenticado' }
+
+  if (!user) return { success: false, error: 'Usuário não autenticado' }
+
+  // Seu SQL não tem `clients.user_id`, então usamos os metadados do auth para criar `clients`
+  const meta: any = user.user_metadata ?? {}
+  const fullName: string | null =
+    meta.full_name ?? meta.fullName ?? meta.name ?? null
+  const phone: string | null =
+    meta.phone ?? meta.phone_number ?? meta.phoneNumber ?? null
+
+  if (!fullName || !phone) {
+    return {
+      success: false,
+      error: 'Para agendar, sua conta precisa ter `full_name` e `phone` no cadastro.',
+    }
   }
 
-  // Buscar ou criar cliente
-  let { data: client } = await supabase
-    .from('clients')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!client) {
-    // Buscar barbershop_id do barbeiro
-    const { data: barber } = await supabase
-      .from('barbers')
-      .select('barbershop_id')
-      .eq('id', data.barberId)
-      .single()
-
-    if (!barber) {
-      return { success: false, error: 'Barbeiro não encontrado' }
-    }
-
-    const { data: newClient, error: clientError } = await supabase
-      .from('clients')
-      .insert({
-        user_id: user.id,
-        barbershop_id: barber.barbershop_id,
-      })
-      .select('id')
-      .single()
-
-    if (clientError) {
-      return { success: false, error: 'Erro ao criar cliente' }
-    }
-    client = newClient
-  }
-
-  // Buscar barbershop_id do barbeiro
-  const { data: barber } = await supabase
+  const { data: barber, error: barberError } = await supabase
     .from('barbers')
     .select('barbershop_id')
     .eq('id', data.barberId)
     .single()
 
-  if (!barber) {
+  if (barberError || !barber) {
     return { success: false, error: 'Barbeiro não encontrado' }
   }
 
-  // Calcular horário de término
-  const startHour = parseInt(data.time.split(':')[0])
-  const endHour = startHour + Math.ceil(data.duration / 60)
-  const endTime = `${endHour.toString().padStart(2, '0')}:00`
-
-  // Criar agendamento
-  const { data: appointment, error } = await supabase
-    .from('appointments')
+  const { data: client, error: clientError } = await supabase
+    .from('clients')
     .insert({
-      client_id: client.id,
-      barber_id: data.barberId,
-      service_id: data.serviceId,
       barbershop_id: barber.barbershop_id,
-      appointment_date: data.date,
-      start_time: data.time,
-      end_time: endTime,
-      status: 'pending',
+      name: String(fullName),
+      phone: String(phone),
     })
     .select('id')
     .single()
 
-  if (error) {
+  // Se o RLS estiver bloqueando o INSERT em clients (muito comum durante setup),
+  // ainda assim conseguimos criar o agendamento porque `appointments_insert_public` é público
+  // e `client_id` no schema é nullable.
+  if (clientError || !client) {
+    console.error('Error creating client:', clientError)
+
+    // 42501 = insufficient_privilege (inclui violações de RLS)
+    const isRlsBlock = (clientError as any)?.code === '42501'
+    if (!isRlsBlock) {
+      return { success: false, error: 'Erro ao criar cliente' }
+    }
+  }
+
+  const { data: appointment, error } = await supabase
+    .from('appointments')
+    .insert({
+      client_id: client?.id ?? null,
+      barber_id: data.barberId,
+      service_id: data.serviceId,
+      barbershop_id: barber.barbershop_id,
+      appointment_date: data.date,
+      appointment_time: data.time,
+      status: 'scheduled',
+    })
+    .select('id')
+    .single()
+
+  if (error || !appointment) {
     console.error('Error creating appointment:', error)
     return { success: false, error: 'Erro ao criar agendamento' }
   }
 
   revalidatePath('/dashboard')
   revalidatePath('/meus-agendamentos')
-  
+
   return { success: true, appointmentId: appointment.id }
 }
 
 export async function getUserAppointments(): Promise<Appointment[]> {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) return []
 
-  // Buscar cliente do usuário
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!client) return []
+  const barbershopIds = await getOwnedBarbershopIds()
+  if (barbershopIds.length === 0) return []
 
   const { data, error } = await supabase
     .from('appointments')
     .select(`
       *,
       service:services(*),
-      barber:barbers(
-        *,
-        profile:profiles(*)
-      )
+      barber:barbers(*)
     `)
-    .eq('client_id', client.id)
+    .in('barbershop_id', barbershopIds)
     .order('appointment_date', { ascending: true })
-    .order('start_time', { ascending: true })
+    .order('appointment_time', { ascending: true })
 
   if (error) {
     console.error('Error fetching appointments:', error)
     return []
   }
 
-  return data || []
+  return (data || []).map((apt: any) => ({
+    ...apt,
+    service: apt?.service
+      ? {
+          ...apt.service,
+          price: Number(apt.service.price),
+          duration_minutes: Number(apt.service.duration_minutes),
+        }
+      : undefined,
+  }))
 }
 
 export async function getNextAppointment(): Promise<Appointment | null> {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) return null
 
-  // Buscar cliente do usuário
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!client) return null
+  const barbershopIds = await getOwnedBarbershopIds()
+  if (barbershopIds.length === 0) return null
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -233,29 +292,35 @@ export async function getNextAppointment(): Promise<Appointment | null> {
     .from('appointments')
     .select(`
       *,
-      service:services(*)
+      service:services(id, name, price, duration_minutes)
     `)
-    .eq('client_id', client.id)
+    .in('barbershop_id', barbershopIds)
     .gte('appointment_date', today)
-    .in('status', ['pending', 'confirmed'])
+    .eq('status', 'scheduled')
     .order('appointment_date', { ascending: true })
-    .order('start_time', { ascending: true })
+    .order('appointment_time', { ascending: true })
     .limit(1)
     .single()
 
-  if (error) {
-    return null
+  if (error || !data) return null
+  return {
+    ...data,
+    service: data?.service
+      ? {
+          ...data.service,
+          price: Number(data.service.price),
+          duration_minutes: Number(data.service.duration_minutes),
+        }
+      : undefined,
   }
-
-  return data
 }
 
 export async function cancelAppointment(appointmentId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-  
+
   const { error } = await supabase
     .from('appointments')
-    .update({ status: 'cancelled' })
+    .update({ status: 'canceled' })
     .eq('id', appointmentId)
 
   if (error) {
