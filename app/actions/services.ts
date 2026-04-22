@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { Service } from '@/lib/types'
+import { getRoleScope } from '@/app/actions/rbac'
 
 export async function getServices(): Promise<Service[]> {
   const supabase = await createClient()
@@ -14,14 +15,8 @@ export async function getServices(): Promise<Service[]> {
   // Se não tiver nenhuma (ex.: barbearia demo com owner_id nulo), faz fallback pra qualquer barbearia pública.
   let barbershopIds: string[] = []
   if (user) {
-    const { data: owned, error: ownedError } = await supabase
-      .from('barbershops')
-      .select('id')
-      .eq('owner_id', user.id)
-
-    if (!ownedError && owned) {
-      barbershopIds = owned.map((s) => s.id)
-    }
+    const scope = await getRoleScope()
+    barbershopIds = scope.barbershopIds
   }
 
   if (barbershopIds.length === 0) {

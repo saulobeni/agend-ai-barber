@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getPostLoginRedirectPath } from '@/app/actions/rbac'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -17,7 +18,8 @@ export async function login(formData: FormData) {
     return { error: error.message }
   }
 
-  redirect('/dashboard')
+  const redirectPath = await getPostLoginRedirectPath()
+  redirect(redirectPath)
 }
 
 export async function signup(formData: FormData) {

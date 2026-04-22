@@ -80,3 +80,28 @@ export interface Payment {
   paid_at: string | null
   created_at: string
 }
+
+export type UserRole = 'admin' | 'super_admin'
+
+export interface UserRoleAssignment {
+  id: string
+  user_id: string
+  role: UserRole
+  barbershop_id: string | null
+  created_at: string
+}
+
+export interface DashboardReportMetrics {
+  totalAppointments: number
+  scheduledAppointments: number
+  completedAppointments: number
+  canceledAppointments: number
+  totalRevenue: number
+}
+
+export interface ServiceReportItem {
+  service_id: string
+  service_name: string
+  bookings: number
+  revenue: number
+}

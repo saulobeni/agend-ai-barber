@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Appointment, Barber } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
+import { getRoleScope } from '@/app/actions/rbac'
 
 function parseTimeToMinutes(time: string): number {
   // Supabase often returns TIME as `HH:MM:SS`, but we also accept `HH:MM`.
@@ -18,23 +19,11 @@ function minutesToTimeString(totalMinutes: number): string {
   return `${hh}:${mm}`
 }
 
-async function getOwnedBarbershopIds(): Promise<string[]> {
+async function getScopedBarbershopIds(): Promise<string[]> {
+  const scope = await getRoleScope()
+  if (scope.barbershopIds.length > 0) return scope.barbershopIds
+
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return []
-
-  const { data: owned } = await supabase
-    .from('barbershops')
-    .select('id')
-    .eq('owner_id', user.id)
-
-  const ids = (owned || []).map((s) => s.id)
-  if (ids.length > 0) return ids
-
-  // Fallback: pega qualquer barbearia pública (ex.: demo com owner_id nulo)
   const { data: anyShop } = await supabase.from('barbershops').select('id').limit(1)
   return (anyShop || []).map((s) => s.id)
 }
@@ -50,7 +39,7 @@ export async function getAvailableBarbers(barbershopId?: string): Promise<Barber
   if (barbershopId) {
     query = query.eq('barbershop_id', barbershopId)
   } else {
-    const ownedIds = await getOwnedBarbershopIds()
+    const ownedIds = await getScopedBarbershopIds()
     if (ownedIds.length > 0) query = query.in('barbershop_id', ownedIds)
   }
 
@@ -243,7 +232,7 @@ export async function getUserAppointments(): Promise<Appointment[]> {
 
   if (!user) return []
 
-  const barbershopIds = await getOwnedBarbershopIds()
+  const barbershopIds = await getScopedBarbershopIds()
   if (barbershopIds.length === 0) return []
 
   const { data, error } = await supabase
@@ -283,7 +272,7 @@ export async function getNextAppointment(): Promise<Appointment | null> {
 
   if (!user) return null
 
-  const barbershopIds = await getOwnedBarbershopIds()
+  const barbershopIds = await getScopedBarbershopIds()
   if (barbershopIds.length === 0) return null
 
   const today = new Date().toISOString().split('T')[0]
