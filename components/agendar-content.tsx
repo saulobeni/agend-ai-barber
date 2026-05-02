@@ -189,7 +189,7 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
           {/* Calendário e Horários */}
           <div className="lg:col-span-2 space-y-8">
             {/* Seleção de Barbeiro */}
-            {barbers.length > 1 && (
+            {barbers.length > 0 && (
               <section>
                 <h2 className="text-lg font-semibold text-foreground mb-4">Escolha o barbeiro</h2>
                 <div className="flex flex-wrap gap-2">

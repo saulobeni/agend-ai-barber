@@ -136,7 +136,7 @@ export function DashboardContent({ services, nextAppointment, userEmail }: Dashb
                       {formatPrice(service.price)}
                     </span>
                     <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                      <Link href={`/agendar/${service.name.toLowerCase()}`}>
+                      <Link href={`/agendar/${service.id}`}>
                         Agendar Agora
                       </Link>
                     </Button>

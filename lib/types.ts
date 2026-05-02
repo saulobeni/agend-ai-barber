@@ -5,6 +5,7 @@ export interface Profile {
   id: string
   username: string | null
   full_name: string | null
+  email?: string | null
   created_at: string
 }
 
@@ -58,6 +59,7 @@ export interface Appointment {
   created_at: string
   service?: Service
   barber?: Barber
+  client?: Client
 }
 
 export interface BlockedTime {
@@ -81,7 +83,7 @@ export interface Payment {
   created_at: string
 }
 
-export type UserRole = 'admin' | 'super_admin'
+export type UserRole = 'user' | 'barber' | 'admin' | 'super_admin'
 
 export interface UserRoleAssignment {
   id: string

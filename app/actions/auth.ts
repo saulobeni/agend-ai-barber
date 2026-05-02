@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { getPostLoginRedirectPath } from '@/app/actions/rbac'
 
@@ -30,7 +31,7 @@ export async function signup(formData: FormData) {
   const fullName = formData.get('fullName') as string
   const phone = formData.get('phone') as string
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -45,6 +46,17 @@ export async function signup(formData: FormData) {
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (data.user?.id) {
+    const adminSupabase = createAdminClient()
+    const { error: roleError } = await adminSupabase
+      .from('user_roles')
+      .insert({ user_id: data.user.id, role: 'user', barbershop_id: null })
+
+    if (roleError) {
+      return { error: `Usuario criado, mas falhou ao atribuir role user: ${roleError.message}` }
+    }
   }
 
   return { success: true }
