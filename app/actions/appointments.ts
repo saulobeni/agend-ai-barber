@@ -53,10 +53,10 @@ async function resolveBarberIdsForCurrentUser(
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
+      .trim()
 
-  const profileName = String(ownProfile?.full_name || '').trim()
-  const profileUsername = String(ownProfile?.username || '').trim()
+  const profileName = String(ownProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || '').trim()
+  const profileUsername = String(ownProfile?.username || user?.user_metadata?.username || '').trim()
   const profileEmail = String(ownProfile?.email || user?.email || '').trim().toLowerCase()
   const emailLocalPart = profileEmail.includes('@') ? profileEmail.split('@')[0] : profileEmail
 
@@ -82,7 +82,22 @@ async function resolveBarberIdsForCurrentUser(
 
     const isMatch = identityCandidates.some((candidate) => {
       if (!candidate || !barberName) return false
-      return barberName === candidate || barberName.includes(candidate) || candidate.includes(barberName)
+      
+      const candNoSpace = candidate.replace(/\s+/g, '')
+      const barbNoSpace = barberName.replace(/\s+/g, '')
+
+      if (candNoSpace === barbNoSpace || barbNoSpace.includes(candNoSpace) || candNoSpace.includes(barbNoSpace)) {
+        return true
+      }
+
+      // Check first name match if it's long enough
+      const candFirstWord = candidate.split(/\s+/)[0]
+      const barbFirstWord = barberName.split(/\s+/)[0]
+      if (candFirstWord && barbFirstWord && candFirstWord === barbFirstWord && candFirstWord.length > 3) {
+        return true
+      }
+
+      return false
     })
 
     if (isMatch) {

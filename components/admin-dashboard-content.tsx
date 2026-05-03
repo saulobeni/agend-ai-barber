@@ -3,6 +3,7 @@ import { signOut } from '@/app/actions/auth'
 import {
   createUserByAdmin,
   createServiceByAdmin,
+  createBarbershopBySuperAdmin,
 } from '@/app/actions/admin-management'
 import type { Barber, Barbershop, DashboardReportMetrics, Service, ServiceReportItem, UserRole } from '@/lib/types'
 
@@ -147,10 +148,77 @@ export function AdminDashboardContent({
               </p>
             </div>
 
+            {role === 'super_admin' && (
+              <div className="bg-card border border-border rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold mb-4">Cadastrar nova barbearia</h3>
+                <form action={createBarbershopBySuperAdmin} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm mb-1">Nome da Barbearia</label>
+                      <input
+                        name="name"
+                        type="text"
+                        required
+                        className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        placeholder="Ex.: Barbearia Brothers"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Endereço</label>
+                      <input
+                        name="address"
+                        type="text"
+                        className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        placeholder="Ex.: Rua das Flores, 123"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-3 flex flex-col justify-between">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm mb-1">Horário de Abertura</label>
+                        <input
+                          name="openingTime"
+                          type="time"
+                          defaultValue="09:00"
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Horário de Fechamento</label>
+                        <input
+                          name="closingTime"
+                          type="time"
+                          defaultValue="18:00"
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm mt-auto w-fit">
+                      Cadastrar barbearia
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Cadastrar usuario (Admin ou Barber)</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  {role === 'super_admin' ? 'Cadastrar Administrador' : 'Cadastrar usuario (Admin ou Barber)'}
+                </h3>
                 <form action={createUserByAdmin} className="space-y-3">
+                  {role === 'super_admin' && (
+                    <div>
+                      <label className="block text-sm mb-1">Barbearia Associada</label>
+                      <select name="barbershopId" className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm" required>
+                        <option value="">Selecione uma barbearia</option>
+                        {barbershops.map((shop) => (
+                          <option key={shop.id} value={shop.id}>{shop.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm mb-1">Nome completo</label>
                     <input
@@ -181,69 +249,75 @@ export function AdminDashboardContent({
                       placeholder="Ex.: joao@email.com"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm mb-1">Role</label>
-                    <select name="role" className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm" required>
-                      <option value="admin">admin</option>
-                      <option value="barber">barber</option>
-                    </select>
-                  </div>
+                  {role === 'super_admin' ? (
+                    <input type="hidden" name="role" value="admin" />
+                  ) : (
+                    <div>
+                      <label className="block text-sm mb-1">Role</label>
+                      <select name="role" className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm" required>
+                        <option value="admin">admin</option>
+                        <option value="barber">barber</option>
+                      </select>
+                    </div>
+                  )}
                   <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
                     Criar usuario
                   </button>
                 </form>
               </div>
 
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
-                <form action={createServiceByAdmin} className="space-y-3">
-                  <div>
-                    <label className="block text-sm mb-1">Nome</label>
-                    <input
-                      name="name"
-                      type="text"
-                      required
-                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                      placeholder="Ex.: Corte premium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Descricao</label>
-                    <textarea
-                      name="description"
-                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                      placeholder="Opcional"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+              {role !== 'super_admin' && (
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
+                  <form action={createServiceByAdmin} className="space-y-3">
                     <div>
-                      <label className="block text-sm mb-1">Preco (R$)</label>
+                      <label className="block text-sm mb-1">Nome</label>
                       <input
-                        name="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
+                        name="name"
+                        type="text"
                         required
                         className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        placeholder="Ex.: Corte premium"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm mb-1">Duracao (min)</label>
-                      <input
-                        name="durationMinutes"
-                        type="number"
-                        min="1"
-                        step="1"
-                        required
+                      <label className="block text-sm mb-1">Descricao</label>
+                      <textarea
+                        name="description"
                         className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        placeholder="Opcional"
                       />
                     </div>
-                  </div>
-                  <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                    Cadastrar servico
-                  </button>
-                </form>
-              </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm mb-1">Preco (R$)</label>
+                        <input
+                          name="price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Duracao (min)</label>
+                        <input
+                          name="durationMinutes"
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                      Cadastrar servico
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

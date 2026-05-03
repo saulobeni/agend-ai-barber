@@ -25,7 +25,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (scope.isSuperAdmin || scope.role === 'admin') {
     const { metrics, topServices, barbershops } = await getReportData(selectedBarbershopId)
-    const management = scope.role === 'admin'
+    const management = (scope.role === 'admin' || scope.isSuperAdmin)
       ? await getAdminManagementData()
       : { roles: [], barbers: [], services: [] }
 
@@ -40,7 +40,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         roles={management.roles}
         barbers={management.barbers}
         services={management.services}
-        canManageRoles={scope.role === 'admin'}
+        canManageRoles={scope.role === 'admin' || scope.isSuperAdmin}
       />
     )
   }
@@ -49,9 +49,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect('/barber/dashboard')
   }
 
-  const [services, nextAppointment] = await Promise.all([
-    getServices(),
-    getNextAppointment()
+  const { getBarbershops } = await import("@/app/actions/barbershops")
+
+  const [services, nextAppointment, barbershops] = await Promise.all([
+    getServices(selectedBarbershopId),
+    getNextAppointment(),
+    getBarbershops()
   ])
 
   return (
@@ -59,6 +62,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       services={services} 
       nextAppointment={nextAppointment}
       userEmail={user.email}
+      barbershops={barbershops}
+      selectedBarbershopId={selectedBarbershopId}
     />
   )
 }

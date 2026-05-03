@@ -4,16 +4,19 @@ import { createClient } from '@/lib/supabase/server'
 import type { Service } from '@/lib/types'
 import { getRoleScope } from '@/app/actions/rbac'
 
-export async function getServices(): Promise<Service[]> {
+export async function getServices(barbershopId?: string): Promise<Service[]> {
   const supabase = await createClient()
 
   const scope = await getRoleScope()
   // Cliente (role user ou sem role) visualiza todos os servicos publicos.
   if (!scope.role || scope.role === 'user') {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .order('price', { ascending: true })
+    let query = supabase.from('services').select('*').order('price', { ascending: true })
+
+    if (barbershopId) {
+      query = query.eq('barbershop_id', barbershopId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching services:', error)

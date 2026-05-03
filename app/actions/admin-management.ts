@@ -25,7 +25,7 @@ async function resolveTargetBarbershopId(inputBarbershopId?: string): Promise<st
 
 export async function getAdminManagementData() {
   const scope = await getRoleScope()
-  if (scope.role !== 'admin') {
+  if (scope.role !== 'admin' && scope.role !== 'super_admin') {
     return { roles: [], barbers: [], services: [], barbershops: [] }
   }
 
@@ -77,7 +77,7 @@ function sanitizeUsername(value: string): string {
 
 export async function createUserByAdmin(formData: FormData): Promise<ActionResult> {
   const scope = await getRoleScope()
-  if (scope.role !== 'admin') {
+  if (scope.role !== 'admin' && scope.role !== 'super_admin') {
     return { success: false, error: 'Sem permissao para cadastrar usuarios' }
   }
 
@@ -85,6 +85,7 @@ export async function createUserByAdmin(formData: FormData): Promise<ActionResul
   const usernameInput = String(formData.get('username') || '').trim()
   const email = String(formData.get('email') || '').trim().toLowerCase()
   const role = String(formData.get('role') || '').trim() as 'admin' | 'barber'
+  const barbershopIdForm = String(formData.get('barbershopId') || '').trim()
 
   if (!fullName) return { success: false, error: 'Nome completo obrigatorio' }
   if (!usernameInput) return { success: false, error: 'Apelido obrigatorio' }
@@ -94,7 +95,14 @@ export async function createUserByAdmin(formData: FormData): Promise<ActionResul
     return { success: false, error: 'Role invalida' }
   }
 
-  const targetBarbershopId = await resolveTargetBarbershopId()
+  let targetBarbershopId: string | null = null
+  if (scope.role === 'super_admin') {
+    if (!barbershopIdForm) return { success: false, error: 'Barbearia obrigatoria para super admin' }
+    targetBarbershopId = barbershopIdForm
+  } else {
+    targetBarbershopId = await resolveTargetBarbershopId()
+  }
+
   if (!targetBarbershopId) {
     return { success: false, error: 'Nao foi possivel determinar a barbearia do cadastro' }
   }
@@ -189,6 +197,34 @@ export async function createServiceByAdmin(formData: FormData): Promise<ActionRe
     description: description || null,
     price,
     duration_minutes: durationMinutes,
+  })
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function createBarbershopBySuperAdmin(formData: FormData): Promise<ActionResult> {
+  const scope = await getRoleScope()
+  if (scope.role !== 'super_admin') {
+    return { success: false, error: 'Apenas Super Admin pode cadastrar barbearias' }
+  }
+
+  const name = String(formData.get('name') || '').trim()
+  const address = String(formData.get('address') || '').trim()
+  const openingTime = String(formData.get('openingTime') || '').trim() || '09:00:00'
+  const closingTime = String(formData.get('closingTime') || '').trim() || '18:00:00'
+
+  if (!name) return { success: false, error: 'Nome da barbearia obrigatorio' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('barbershops').insert({
+    owner_id: scope.userId,
+    name,
+    address: address || null,
+    opening_time: openingTime,
+    closing_time: closingTime,
   })
 
   if (error) return { success: false, error: error.message }
