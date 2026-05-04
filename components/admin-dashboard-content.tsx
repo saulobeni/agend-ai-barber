@@ -4,6 +4,14 @@ import {
   createUserByAdmin,
   createServiceByAdmin,
   createBarbershopBySuperAdmin,
+  updateServiceByAdmin,
+  deleteServiceByAdmin,
+  updateBarberByAdmin,
+  deleteBarberByAdmin,
+  updateUserByAdmin,
+  deleteUserByAdmin,
+  updateBarbershopBySuperAdmin,
+  deleteBarbershopBySuperAdmin,
 } from '@/app/actions/admin-management'
 import type { Barber, Barbershop, DashboardReportMetrics, Service, ServiceReportItem, UserRole } from '@/lib/types'
 
@@ -25,6 +33,14 @@ interface AdminDashboardContentProps {
   roles?: RoleItem[]
   barbers?: Barber[]
   services?: Service[]
+  users?: Array<{
+    id: string
+    full_name: string
+    username: string
+    email: string
+    role: UserRole
+    barbershop_id: string | null
+  }>
   canManageRoles?: boolean
 }
 
@@ -46,9 +62,17 @@ export function AdminDashboardContent({
   roles = [],
   barbers = [],
   services = [],
+  users = [],
   canManageRoles = false,
 }: AdminDashboardContentProps) {
   const barbershopName = barbershops.find((b) => b.id === selectedBarbershopId)?.name
+  const barbershopNameById = new Map(barbershops.map((shop) => [shop.id, shop.name]))
+  const userById = new Map(users.map((item) => [item.id, item]))
+  const isSuperAdmin = role === 'super_admin'
+  const totalBookings = topServices.reduce((sum, item) => sum + item.bookings, 0)
+  const adminCount = roles.filter((item) => item.role === 'admin').length
+  const barberCount = barbers.length
+  const serviceCount = services.length
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,7 +132,11 @@ export function AdminDashboardContent({
           <MetricCard title="Agendados" value={String(metrics.scheduledAppointments)} />
           <MetricCard title="Concluidos" value={String(metrics.completedAppointments)} />
           <MetricCard title="Cancelados" value={String(metrics.canceledAppointments)} />
-          <MetricCard title="Receita" value={formatCurrency(metrics.totalRevenue)} />
+          {isSuperAdmin ? (
+            <MetricCard title="Barbearias na plataforma" value={String(barbershops.length)} />
+          ) : (
+            <MetricCard title="Receita" value={formatCurrency(metrics.totalRevenue)} />
+          )}
         </section>
 
         <section className="bg-card border border-border rounded-lg p-4">
@@ -122,7 +150,7 @@ export function AdminDashboardContent({
                   <tr className="text-left text-muted-foreground border-b border-border">
                     <th className="py-2">Servico</th>
                     <th className="py-2">Pedidos</th>
-                    <th className="py-2">Receita</th>
+                    <th className="py-2">{isSuperAdmin ? 'Participacao' : 'Receita'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -130,7 +158,11 @@ export function AdminDashboardContent({
                     <tr key={item.service_id} className="border-b border-border/50">
                       <td className="py-2">{item.service_name}</td>
                       <td className="py-2">{item.bookings}</td>
-                      <td className="py-2">{formatCurrency(item.revenue)}</td>
+                      <td className="py-2">
+                        {isSuperAdmin
+                          ? `${totalBookings > 0 ? Math.round((item.bookings / totalBookings) * 100) : 0}%`
+                          : formatCurrency(item.revenue)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -138,6 +170,14 @@ export function AdminDashboardContent({
             </div>
           )}
         </section>
+
+        {isSuperAdmin && (
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard title="Admins cadastrados" value={String(adminCount)} />
+            <MetricCard title="Barbeiros cadastrados" value={String(barberCount)} />
+            <MetricCard title="Servicos cadastrados" value={String(serviceCount)} />
+          </section>
+        )}
 
         {canManageRoles && (
           <section className="space-y-6">
@@ -266,58 +306,59 @@ export function AdminDashboardContent({
                 </form>
               </div>
 
-              {role !== 'super_admin' && (
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
-                  <form action={createServiceByAdmin} className="space-y-3">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
+                <form action={createServiceByAdmin} className="space-y-3">
+                  {role === 'super_admin' && (
                     <div>
-                      <label className="block text-sm mb-1">Nome</label>
+                      <label className="block text-sm mb-1">Barbearia Associada</label>
+                      <select name="barbershopId" className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm" required>
+                        <option value="">Selecione uma barbearia</option>
+                        {barbershops.map((shop) => (
+                          <option key={shop.id} value={shop.id}>{shop.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm mb-1">Nome</label>
+                    <input
+                      name="name"
+                      type="text"
+                      required
+                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                      placeholder="Ex.: Corte premium"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-sm mb-1">Preco (R$)</label>
                       <input
-                        name="name"
-                        type="text"
+                        name="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
                         required
                         className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                        placeholder="Ex.: Corte premium"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm mb-1">Descricao</label>
-                      <textarea
-                        name="description"
+                      <label className="block text-sm mb-1">Duracao (min)</label>
+                      <input
+                        name="durationMinutes"
+                        type="number"
+                        min="1"
+                        step="1"
+                        required
                         className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                        placeholder="Opcional"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm mb-1">Preco (R$)</label>
-                        <input
-                          name="price"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          required
-                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm mb-1">Duracao (min)</label>
-                        <input
-                          name="durationMinutes"
-                          type="number"
-                          min="1"
-                          step="1"
-                          required
-                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                      Cadastrar servico
-                    </button>
-                  </form>
-                </div>
-              )}
+                  </div>
+                  <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                    Cadastrar servico
+                  </button>
+                </form>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -326,11 +367,44 @@ export function AdminDashboardContent({
                 {barbers.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum barbeiro cadastrado no seu escopo.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
                     {barbers.map((barber) => (
                       <div key={barber.id} className="text-sm border border-border rounded-md p-2">
                         <div className="font-medium">{barber.name}</div>
-                        <div className="text-muted-foreground break-all">barbershop: {barber.barbershop_id}</div>
+                        <div className="text-muted-foreground">
+                          barbearia: {barbershopNameById.get(barber.barbershop_id) || 'Nao informada'}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <details className="group">
+                            <summary className="list-none cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs inline-block">
+                              Editar
+                            </summary>
+                            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                              <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                                <div className="text-sm font-semibold">Editar barbeiro</div>
+                                <form action={updateBarberByAdmin} className="space-y-3">
+                                  <input type="hidden" name="barberId" value={barber.id} />
+                                  <input
+                                    name="name"
+                                    defaultValue={barber.name}
+                                    className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                                      Salvar
+                                    </button>
+                                  </div>
+                                </form>
+                              </div>
+                            </div>
+                          </details>
+                          <form action={deleteBarberByAdmin}>
+                            <input type="hidden" name="barberId" value={barber.id} />
+                            <button className="bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs">
+                              Excluir
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -338,18 +412,113 @@ export function AdminDashboardContent({
               </div>
 
               <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Roles atuais</h3>
+                <h3 className="text-lg font-semibold mb-4">Usuarios</h3>
                 {roles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhuma role cadastrada.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum usuario encontrado no escopo.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
                     {roles.map((r) => (
                       <div key={r.id} className="text-sm border border-border rounded-md p-2">
-                        <div className="font-medium">{r.role}</div>
-                        <div className="text-muted-foreground break-all">user: {r.user_id}</div>
-                        <div className="text-muted-foreground break-all">
-                          barbershop: {r.barbershop_id || 'todas'}
+                        {(() => {
+                          const user = userById.get(r.user_id)
+                          const editModalId = `edit-user-${r.id}`
+                          const deleteModalId = `delete-user-${r.id}`
+                          return (
+                            <>
+                        <div className="font-medium">
+                          {user?.full_name || user?.email || 'Usuario sem nome'}
                         </div>
+                        <div className="text-muted-foreground">
+                          email: {user?.email || 'nao informado'}
+                        </div>
+                        <div className="text-muted-foreground">perfil: {r.role}</div>
+                        <div className="text-muted-foreground">
+                          barbearia: {r.barbershop_id ? (barbershopNameById.get(r.barbershop_id) || 'Nao informada') : 'todas'}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <label
+                            htmlFor={editModalId}
+                            className="cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs"
+                          >
+                            Editar
+                          </label>
+                          <label
+                            htmlFor={deleteModalId}
+                            className="cursor-pointer bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs"
+                          >
+                            Excluir
+                          </label>
+                        </div>
+
+                        <input id={editModalId} type="checkbox" className="peer/edit hidden" />
+                        <div className="fixed inset-0 z-50 hidden peer-checked/edit:flex items-center justify-center p-4">
+                          <label htmlFor={editModalId} className="absolute inset-0 bg-black/50" />
+                          <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold">Editar usuario</div>
+                              <label htmlFor={editModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
+                                x
+                              </label>
+                            </div>
+                            <form action={updateUserByAdmin} className="space-y-3">
+                              <input type="hidden" name="userId" value={r.user_id} />
+                              <input
+                                name="fullName"
+                                defaultValue={user?.full_name || ''}
+                                className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                              />
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <input
+                                  name="username"
+                                  defaultValue={user?.username || ''}
+                                  className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                />
+                                <input
+                                  name="email"
+                                  type="email"
+                                  defaultValue={user?.email || ''}
+                                  className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                />
+                                <select
+                                  name="role"
+                                  defaultValue={r.role === 'barber' ? 'barber' : 'admin'}
+                                  className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                >
+                                  <option value="admin">admin</option>
+                                  <option value="barber">barber</option>
+                                </select>
+                              </div>
+                              <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                                Salvar
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+
+                        <input id={deleteModalId} type="checkbox" className="peer/delete hidden" />
+                        <div className="fixed inset-0 z-50 hidden peer-checked/delete:flex items-center justify-center p-4">
+                          <label htmlFor={deleteModalId} className="absolute inset-0 bg-black/50" />
+                          <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold">Excluir usuario</div>
+                              <label htmlFor={deleteModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
+                                x
+                              </label>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Confirma a exclusao deste usuario?
+                            </p>
+                            <form action={deleteUserByAdmin}>
+                              <input type="hidden" name="userId" value={r.user_id} />
+                              <button className="bg-destructive text-destructive-foreground px-3 py-2 rounded-md text-sm">
+                                Confirmar exclusao
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                            </>
+                          )
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -361,19 +530,182 @@ export function AdminDashboardContent({
                 {services.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum servico cadastrado no seu escopo.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
                     {services.map((service) => (
                       <div key={service.id} className="text-sm border border-border rounded-md p-2">
                         <div className="font-medium">{service.name}</div>
                         <div className="text-muted-foreground">
                           {formatCurrency(service.price)} - {service.duration_minutes} min
                         </div>
-                        <div className="text-muted-foreground break-all">barbershop: {service.barbershop_id}</div>
+                        <div className="text-muted-foreground">
+                          barbearia: {barbershopNameById.get(service.barbershop_id) || 'Nao informada'}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <details className="group">
+                            <summary className="list-none cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs inline-block">
+                              Editar
+                            </summary>
+                            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                              <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                                <div className="text-sm font-semibold">Editar servico</div>
+                                <form action={updateServiceByAdmin} className="space-y-3">
+                                  <input type="hidden" name="serviceId" value={service.id} />
+                                  <input
+                                    name="name"
+                                    defaultValue={service.name}
+                                    className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                      name="price"
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      defaultValue={service.price}
+                                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                    />
+                                    <input
+                                      name="durationMinutes"
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      defaultValue={service.duration_minutes}
+                                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                    />
+                                  </div>
+                                  <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                                    Salvar
+                                  </button>
+                                </form>
+                              </div>
+                            </div>
+                          </details>
+                          <form action={deleteServiceByAdmin}>
+                            <input type="hidden" name="serviceId" value={service.id} />
+                            <button className="bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs">
+                              Excluir
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-4">Barbearias</h3>
+              {barbershops.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma barbearia no escopo.</p>
+              ) : (
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
+                  {barbershops.map((shop) => {
+                    const editModalId = `edit-shop-${shop.id}`
+                    const deleteModalId = `delete-shop-${shop.id}`
+                    return (
+                      <div key={shop.id} className="text-sm border border-border rounded-md p-2">
+                        <div className="font-medium">{shop.name}</div>
+                        <div className="text-muted-foreground">{shop.address || 'Endereco nao informado'}</div>
+                        <div className="text-muted-foreground">
+                          horario: {shop.opening_time} - {shop.closing_time}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <label
+                            htmlFor={editModalId}
+                            className="cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs"
+                          >
+                            Editar
+                          </label>
+                          <label
+                            htmlFor={deleteModalId}
+                            className="cursor-pointer bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs"
+                          >
+                            Excluir
+                          </label>
+                        </div>
+
+                        <input id={editModalId} type="checkbox" className="peer/edit hidden" />
+                        <div className="fixed inset-0 z-50 hidden peer-checked/edit:flex items-center justify-center p-4">
+                          <label htmlFor={editModalId} className="absolute inset-0 bg-black/50" />
+                          <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold">Editar barbearia</div>
+                              <label htmlFor={editModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
+                                x
+                              </label>
+                            </div>
+                            <form action={updateBarbershopBySuperAdmin} className="space-y-3">
+                              <input type="hidden" name="barbershopId" value={shop.id} />
+                              <div>
+                                <label className="block text-sm mb-1">Nome</label>
+                                <input
+                                  name="name"
+                                  defaultValue={shop.name}
+                                  className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm mb-1">Endereco</label>
+                                <input
+                                  name="address"
+                                  defaultValue={shop.address || ''}
+                                  className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-sm mb-1">Abertura</label>
+                                  <input
+                                    name="openingTime"
+                                    type="time"
+                                    defaultValue={String(shop.opening_time || '09:00:00').slice(0, 5)}
+                                    className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm mb-1">Fechamento</label>
+                                  <input
+                                    name="closingTime"
+                                    type="time"
+                                    defaultValue={String(shop.closing_time || '18:00:00').slice(0, 5)}
+                                    className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                                Salvar
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+
+                        <input id={deleteModalId} type="checkbox" className="peer/delete hidden" />
+                        <div className="fixed inset-0 z-50 hidden peer-checked/delete:flex items-center justify-center p-4">
+                          <label htmlFor={deleteModalId} className="absolute inset-0 bg-black/50" />
+                          <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold">Excluir barbearia</div>
+                              <label htmlFor={deleteModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
+                                x
+                              </label>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Confirma a exclusao da barbearia <span className="font-medium">{shop.name}</span>?
+                            </p>
+                            <form action={deleteBarbershopBySuperAdmin}>
+                              <input type="hidden" name="barbershopId" value={shop.id} />
+                              <button className="bg-destructive text-destructive-foreground px-3 py-2 rounded-md text-sm">
+                                Confirmar exclusao
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </section>
         )}

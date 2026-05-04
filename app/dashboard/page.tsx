@@ -27,7 +27,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const { metrics, topServices, barbershops } = await getReportData(selectedBarbershopId)
     const management = (scope.role === 'admin' || scope.isSuperAdmin)
       ? await getAdminManagementData()
-      : { roles: [], barbers: [], services: [] }
+      : { roles: [], barbers: [], services: [], users: [] }
 
     return (
       <AdminDashboardContent
@@ -40,6 +40,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         roles={management.roles}
         barbers={management.barbers}
         services={management.services}
+        users={management.users}
         canManageRoles={scope.role === 'admin' || scope.isSuperAdmin}
       />
     )
