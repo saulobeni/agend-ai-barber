@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Appointment, Barber } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { getRoleScope } from '@/app/actions/rbac'
@@ -22,10 +23,175 @@ function minutesToTimeString(totalMinutes: number): string {
 async function getScopedBarbershopIds(): Promise<string[]> {
   const scope = await getRoleScope()
   if (scope.barbershopIds.length > 0) return scope.barbershopIds
+  return []
+}
 
-  const supabase = await createClient()
-  const { data: anyShop } = await supabase.from('barbershops').select('id').limit(1)
-  return (anyShop || []).map((s) => s.id)
+async function resolveBarberIdsForCurrentUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  barbershopIds: string[],
+): Promise<string[]> {
+  if (barbershopIds.length === 0) return []
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: ownProfile } = await supabase
+    .from('profiles')
+    .select('full_name, username, email')
+    .eq('id', userId)
+    .single()
+
+  const { data: barberRows } = await supabase
+    .from('barbers')
+    .select('id, name')
+    .in('barbershop_id', barbershopIds)
+
+  const normalizeText = (value: string): string =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+
+  const profileName = String(ownProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || '').trim()
+  const profileUsername = String(ownProfile?.username || user?.user_metadata?.username || '').trim()
+  const profileEmail = String(ownProfile?.email || user?.email || '').trim().toLowerCase()
+  const emailLocalPart = profileEmail.includes('@') ? profileEmail.split('@')[0] : profileEmail
+
+  const identityCandidates = [
+    profileName,
+    profileUsername,
+    emailLocalPart,
+  ]
+    .map((value) => normalizeText(value))
+    .filter(Boolean)
+
+  const barberIds = new Set<string>()
+  for (const row of barberRows || []) {
+    const id = String((row as any).id || '')
+    const rawName = String((row as any).name || '').trim()
+    const barberName = normalizeText(rawName)
+    if (!id) continue
+
+    if (id === userId) {
+      barberIds.add(id)
+      continue
+    }
+
+    const isMatch = identityCandidates.some((candidate) => {
+      if (!candidate || !barberName) return false
+      
+      const candNoSpace = candidate.replace(/\s+/g, '')
+      const barbNoSpace = barberName.replace(/\s+/g, '')
+
+      if (candNoSpace === barbNoSpace || barbNoSpace.includes(candNoSpace) || candNoSpace.includes(barbNoSpace)) {
+        return true
+      }
+
+      // Check first name match if it's long enough
+      const candFirstWord = candidate.split(/\s+/)[0]
+      const barbFirstWord = barberName.split(/\s+/)[0]
+      if (candFirstWord && barbFirstWord && candFirstWord === barbFirstWord && candFirstWord.length > 3) {
+        return true
+      }
+
+      return false
+    })
+
+    if (isMatch) {
+      barberIds.add(id)
+    }
+  }
+
+  return Array.from(barberIds)
+}
+
+async function getCurrentUserIdentity(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return null
+
+  const meta: any = user.user_metadata ?? {}
+  let fullName: string | null = meta.full_name ?? meta.fullName ?? meta.name ?? null
+  const phone: string | null = meta.phone ?? meta.phone_number ?? meta.phoneNumber ?? null
+
+  // Some legacy users may have name only in `profiles`.
+  if (!fullName) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+    fullName = profile?.full_name ?? null
+  }
+
+  return { user, fullName, phone }
+}
+
+async function getClientIdsForCurrentUser(
+  fullName: string | null,
+  phone: string | null,
+): Promise<string[]> {
+  if (!fullName && !phone) return []
+
+  const adminSupabase = createAdminClient()
+  let clientsQuery = adminSupabase.from('clients').select('id')
+  if (phone) clientsQuery = clientsQuery.eq('phone', String(phone))
+  if (!phone && fullName) clientsQuery = clientsQuery.eq('name', String(fullName))
+
+  const { data: clientRows, error } = await clientsQuery
+  if (error) {
+    console.error('Error fetching client ids for current user:', error)
+    return []
+  }
+
+  return (clientRows || []).map((c: any) => String(c.id))
+}
+
+async function getOrCreateClientForBarbershop(data: {
+  barbershopId: string
+  fullName: string
+  phone: string
+}): Promise<{ id: string } | null> {
+  const adminSupabase = createAdminClient()
+
+  const { data: existingClient, error: existingClientError } = await adminSupabase
+    .from('clients')
+    .select('id')
+    .eq('barbershop_id', data.barbershopId)
+    .eq('phone', data.phone)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingClientError) {
+    console.error('Error searching existing client:', existingClientError)
+    return null
+  }
+
+  if (existingClient?.id) {
+    return { id: String(existingClient.id) }
+  }
+
+  const { data: createdClient, error: createdClientError } = await adminSupabase
+    .from('clients')
+    .insert({
+      barbershop_id: data.barbershopId,
+      name: data.fullName,
+      phone: data.phone,
+    })
+    .select('id')
+    .single()
+
+  if (createdClientError || !createdClient) {
+    console.error('Error creating client:', createdClientError)
+    return null
+  }
+
+  return { id: String(createdClient.id) }
 }
 
 export async function getAvailableBarbers(barbershopId?: string): Promise<Barber[]> {
@@ -147,16 +313,12 @@ export async function createAppointment(data: {
 }): Promise<{ success: boolean; error?: string; appointmentId?: string }> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { success: false, error: 'Usuário não autenticado' }
+  const identity = await getCurrentUserIdentity(supabase)
+  if (!identity?.user) return { success: false, error: 'Usuário não autenticado' }
 
   // Seu SQL não tem `clients.user_id`, então usamos os metadados do auth para criar `clients`
-  const meta: any = user.user_metadata ?? {}
-  const fullName: string | null =
-    meta.full_name ?? meta.fullName ?? meta.name ?? null
-  const phone: string | null =
-    meta.phone ?? meta.phone_number ?? meta.phoneNumber ?? null
+  const fullName = identity.fullName
+  const phone = identity.phone
 
   if (!fullName || !phone) {
     return {
@@ -175,33 +337,20 @@ export async function createAppointment(data: {
     return { success: false, error: 'Barbeiro não encontrado' }
   }
 
-  const { data: client, error: clientError } = await supabase
-    .from('clients')
-    .insert({
-      barbershop_id: barber.barbershop_id,
-      name: String(fullName),
-      phone: String(phone),
-    })
-    .select('id')
-    .single()
+  const client = await getOrCreateClientForBarbershop({
+    barbershopId: String(barber.barbershop_id),
+    fullName: String(fullName),
+    phone: String(phone),
+  })
 
-  // Se o RLS estiver bloqueando o INSERT em clients (muito comum durante setup),
-  // ainda assim conseguimos criar o agendamento porque `appointments_insert_public` é público
-  // e `client_id` no schema é nullable.
-  if (clientError || !client) {
-    console.error('Error creating client:', clientError)
-
-    // 42501 = insufficient_privilege (inclui violações de RLS)
-    const isRlsBlock = (clientError as any)?.code === '42501'
-    if (!isRlsBlock) {
-      return { success: false, error: 'Erro ao criar cliente' }
-    }
+  if (!client) {
+    return { success: false, error: 'Erro ao criar cliente' }
   }
 
   const { data: appointment, error } = await supabase
     .from('appointments')
     .insert({
-      client_id: client?.id ?? null,
+      client_id: client.id,
       barber_id: data.barberId,
       service_id: data.serviceId,
       barbershop_id: barber.barbershop_id,
@@ -226,25 +375,45 @@ export async function createAppointment(data: {
 export async function getUserAppointments(): Promise<Appointment[]> {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getCurrentUserIdentity(supabase)
+  if (!identity?.user) return []
 
-  if (!user) return []
+  const scope = await getRoleScope()
+  let data: any[] | null = null
+  let error: any = null
 
-  const barbershopIds = await getScopedBarbershopIds()
-  if (barbershopIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      service:services(*),
-      barber:barbers(*)
-    `)
-    .in('barbershop_id', barbershopIds)
-    .order('appointment_date', { ascending: true })
-    .order('appointment_time', { ascending: true })
+  if (scope.role === 'admin' || scope.role === 'super_admin' || scope.role === 'barber') {
+    const barbershopIds = await getScopedBarbershopIds()
+    if (barbershopIds.length === 0) return []
+    const result = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        service:services(*),
+        barber:barbers(*)
+      `)
+      .in('barbershop_id', barbershopIds)
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+    data = result.data
+    error = result.error
+  } else {
+    const clientIds = await getClientIdsForCurrentUser(identity.fullName, identity.phone)
+    if (clientIds.length === 0) return []
+    const adminSupabase = createAdminClient()
+    const result = await adminSupabase
+      .from('appointments')
+      .select(`
+        *,
+        service:services(*),
+        barber:barbers(*)
+      `)
+      .in('client_id', clientIds)
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+    data = result.data
+    error = result.error
+  }
 
   if (error) {
     console.error('Error fetching appointments:', error)
@@ -266,30 +435,52 @@ export async function getUserAppointments(): Promise<Appointment[]> {
 export async function getNextAppointment(): Promise<Appointment | null> {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const identity = await getCurrentUserIdentity(supabase)
+  if (!identity?.user) return null
 
-  if (!user) return null
-
-  const barbershopIds = await getScopedBarbershopIds()
-  if (barbershopIds.length === 0) return null
-
+  const scope = await getRoleScope()
   const today = new Date().toISOString().split('T')[0]
+  let data: any = null
+  let error: any = null
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      service:services(id, name, price, duration_minutes)
-    `)
-    .in('barbershop_id', barbershopIds)
-    .gte('appointment_date', today)
-    .eq('status', 'scheduled')
-    .order('appointment_date', { ascending: true })
-    .order('appointment_time', { ascending: true })
-    .limit(1)
-    .single()
+  if (scope.role === 'admin' || scope.role === 'super_admin' || scope.role === 'barber') {
+    const barbershopIds = await getScopedBarbershopIds()
+    if (barbershopIds.length === 0) return null
+    const result = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        service:services(id, name, price, duration_minutes)
+      `)
+      .in('barbershop_id', barbershopIds)
+      .gte('appointment_date', today)
+      .eq('status', 'scheduled')
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+      .limit(1)
+      .single()
+    data = result.data
+    error = result.error
+  } else {
+    const clientIds = await getClientIdsForCurrentUser(identity.fullName, identity.phone)
+    if (clientIds.length === 0) return null
+    const adminSupabase = createAdminClient()
+    const result = await adminSupabase
+      .from('appointments')
+      .select(`
+        *,
+        service:services(id, name, price, duration_minutes)
+      `)
+      .in('client_id', clientIds)
+      .gte('appointment_date', today)
+      .eq('status', 'scheduled')
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+      .limit(1)
+      .single()
+    data = result.data
+    error = result.error
+  }
 
   if (error || !data) return null
   return {
@@ -319,5 +510,94 @@ export async function cancelAppointment(appointmentId: string): Promise<{ succes
   revalidatePath('/dashboard')
   revalidatePath('/meus-agendamentos')
   
+  return { success: true }
+}
+
+export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return []
+
+  const scope = await getRoleScope()
+  if (scope.role !== 'barber') return []
+
+  const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
+  if (barberIds.length === 0) return []
+
+  const today = new Date().toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(`
+      *,
+      client:clients(id, name, phone, barbershop_id, created_at),
+      service:services(id, name, description, price, duration_minutes, barbershop_id, created_at)
+    `)
+    .in('barber_id', barberIds)
+    .gte('appointment_date', today)
+    .order('appointment_time', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching barber appointments:', error)
+    return []
+  }
+
+  return (data || []).map((apt: any) => ({
+    ...apt,
+    service: apt?.service
+      ? {
+          ...apt.service,
+          price: Number(apt.service.price),
+          duration_minutes: Number(apt.service.duration_minutes),
+        }
+      : undefined,
+    client: apt?.client ? { ...apt.client } : undefined,
+  }))
+}
+
+export async function cancelBarberAppointment(appointmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { success: false, error: 'Usuario nao autenticado' }
+
+  const scope = await getRoleScope()
+  if (scope.role !== 'barber') return { success: false, error: 'Sem permissao' }
+
+  const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
+  if (barberIds.length === 0) {
+    return { success: false, error: 'Barbeiro nao vinculado a um cadastro de atendimento' }
+  }
+
+  const { data: ownAppointment, error: ownError } = await supabase
+    .from('appointments')
+    .select('id, status')
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+    .single()
+
+  if (ownError || !ownAppointment) {
+    return { success: false, error: 'Agendamento nao encontrado para este barbeiro' }
+  }
+
+  if (ownAppointment.status !== 'scheduled') {
+    return { success: false, error: 'Somente agendamentos marcados podem ser cancelados' }
+  }
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'canceled' })
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+
+  if (error) return { success: false, error: 'Erro ao cancelar atendimento' }
+
+  revalidatePath('/barber/dashboard')
+  revalidatePath('/dashboard')
+  revalidatePath('/meus-agendamentos')
   return { success: true }
 }

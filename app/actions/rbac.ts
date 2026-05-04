@@ -66,6 +66,29 @@ export async function getRoleScope(): Promise<ScopeResult> {
     }
   }
 
+  const barberShops = rows
+    .filter((r: any) => r.role === 'barber' && r.barbershop_id)
+    .map((r: any) => String(r.barbershop_id))
+
+  if (barberShops.length > 0) {
+    return {
+      userId: user.id,
+      role: 'barber',
+      isSuperAdmin: false,
+      barbershopIds: barberShops,
+    }
+  }
+
+  const hasUserRole = rows.some((r: any) => r.role === 'user')
+  if (hasUserRole) {
+    return {
+      userId: user.id,
+      role: 'user',
+      isSuperAdmin: false,
+      barbershopIds: [],
+    }
+  }
+
   const { data: owned } = await supabase
     .from('barbershops')
     .select('id')
@@ -82,6 +105,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
 export async function getPostLoginRedirectPath(): Promise<string> {
   const scope = await getRoleScope()
   if (scope.isSuperAdmin || scope.role === 'admin') return '/dashboard'
+  if (scope.role === 'barber') return '/barber/dashboard'
   return '/dashboard'
 }
 

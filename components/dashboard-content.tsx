@@ -1,16 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { Scissors, Calendar, Clock, LogOut, User } from "lucide-react"
+import { Scissors, Calendar, Clock, LogOut, User, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { signOut } from "@/app/actions/auth"
-import type { Service, Appointment } from "@/lib/types"
+import type { Service, Appointment, Barbershop } from "@/lib/types"
 
 interface DashboardContentProps {
   services: Service[]
   nextAppointment: Appointment | null
   userEmail?: string
+  barbershops: Barbershop[]
+  selectedBarbershopId?: string
 }
 
 const serviceIcons: Record<string, string> = {
@@ -37,7 +39,7 @@ function formatDuration(minutes: number): string {
   return `${minutes} min`
 }
 
-export function DashboardContent({ services, nextAppointment, userEmail }: DashboardContentProps) {
+export function DashboardContent({ services, nextAppointment, userEmail, barbershops, selectedBarbershopId }: DashboardContentProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -107,45 +109,74 @@ export function DashboardContent({ services, nextAppointment, userEmail }: Dashb
           )}
         </Card>
 
-        {/* Serviços */}
-        <section>
-          <h3 className="text-xl font-semibold text-foreground mb-4">Nossos Serviços</h3>
+        {/* Barbearias */}
+        <section className="mb-12">
+          <h3 className="text-xl font-semibold text-foreground mb-4">Selecione uma Barbearia</h3>
           
-          {services.length === 0 ? (
+          {barbershops.length === 0 ? (
             <div className="text-muted-foreground text-sm">
-              Nenhum serviço encontrado para sua barbearia.
+              Nenhuma barbearia cadastrada no sistema.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {services.map((service) => (
-                <Card key={service.id} className="bg-card border-border p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="text-2xl">{serviceIcons[service.name] || '💈'}</span>
-                    <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
-                      {formatDuration(service.duration_minutes)}
-                    </span>
-                  </div>
-                  
-                  <h4 className="text-lg font-semibold text-foreground mb-2">{service.name}</h4>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    {service.description || 'Serviço de barbearia profissional.'}
-                  </p>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-primary">
-                      {formatPrice(service.price)}
-                    </span>
-                    <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                      <Link href={`/agendar/${service.name.toLowerCase()}`}>
-                        Agendar Agora
-                      </Link>
-                    </Button>
-                  </div>
-                </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {barbershops.map((shop) => (
+                <Link key={shop.id} href={`?barbershop=${shop.id}`}>
+                  <Card className={`border-border p-6 hover:border-primary transition-colors cursor-pointer ${selectedBarbershopId === shop.id ? 'border-primary ring-1 ring-primary' : 'bg-card'}`}>
+                    <h4 className="text-lg font-semibold text-foreground mb-2">{shop.name}</h4>
+                    {shop.address && (
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <MapPin className="h-4 w-4" />
+                        <span>{shop.address}</span>
+                      </div>
+                    )}
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
         </section>
+
+        {/* Serviços */}
+        {selectedBarbershopId ? (
+          <section>
+            <h3 className="text-xl font-semibold text-foreground mb-4">Serviços da Barbearia</h3>
+            
+            {services.length === 0 ? (
+              <div className="text-muted-foreground text-sm">
+                Nenhum serviço encontrado para esta barbearia.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {services.map((service) => (
+                  <Card key={service.id} className="bg-card border-border p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-2xl">{serviceIcons[service.name] || '💈'}</span>
+                      <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
+                        {formatDuration(service.duration_minutes)}
+                      </span>
+                    </div>
+                    
+                    <h4 className="text-lg font-semibold text-foreground mb-2">{service.name}</h4>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      {service.description || 'Serviço de barbearia profissional.'}
+                    </p>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-bold text-primary">
+                        {formatPrice(service.price)}
+                      </span>
+                      <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                        <Link href={`/agendar/${service.id}`}>
+                          Agendar Agora
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
       </main>
     </div>
   )

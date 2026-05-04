@@ -4,30 +4,33 @@ import { createClient } from '@/lib/supabase/server'
 import type { Service } from '@/lib/types'
 import { getRoleScope } from '@/app/actions/rbac'
 
-export async function getServices(): Promise<Service[]> {
+export async function getServices(barbershopId?: string): Promise<Service[]> {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const scope = await getRoleScope()
+  // Cliente (role user ou sem role) visualiza todos os servicos publicos.
+  if (!scope.role || scope.role === 'user') {
+    let query = supabase.from('services').select('*').order('price', { ascending: true })
 
-  // Busca barbearias do dono (owner_id = auth.uid()).
-  // Se não tiver nenhuma (ex.: barbearia demo com owner_id nulo), faz fallback pra qualquer barbearia pública.
-  let barbershopIds: string[] = []
-  if (user) {
-    const scope = await getRoleScope()
-    barbershopIds = scope.barbershopIds
+    if (barbershopId) {
+      query = query.eq('barbershop_id', barbershopId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching services:', error)
+      return []
+    }
+
+    return (data || []).map((s: any) => ({
+      ...s,
+      price: Number(s.price),
+      duration_minutes: Number(s.duration_minutes),
+    }))
   }
 
-  if (barbershopIds.length === 0) {
-    const { data: anyShop } = await supabase
-      .from('barbershops')
-      .select('id')
-      .limit(1)
-
-    barbershopIds = (anyShop || []).map((s) => s.id)
-  }
-
+  const barbershopIds = scope.barbershopIds
   if (barbershopIds.length === 0) return []
 
   const { data, error } = await supabase
@@ -48,18 +51,21 @@ export async function getServices(): Promise<Service[]> {
   }))
 }
 
-export async function getServiceBySlug(slug: string): Promise<Service | null> {
-  const nameMap: Record<string, string> = {
-    'corte': 'Corte',
-    'barba': 'Barba',
-    'combo': 'Combo',
-  }
-  
-  const serviceName = nameMap[slug.toLowerCase()]
-  
-  if (!serviceName) return null
+function toSlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
 
-  // Reaproveita a lógica de “escopo” do getServices() pra evitar erro de múltiplas linhas.
+export async function getServiceBySlug(slug: string): Promise<Service | null> {
   const services = await getServices()
-  return services.find((s) => s.name === serviceName) ?? null
+  const decoded = decodeURIComponent(slug)
+  return (
+    services.find((s) => s.id === decoded) ??
+    services.find((s) => toSlug(s.name) === toSlug(decoded)) ??
+    null
+  )
 }
