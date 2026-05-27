@@ -6,6 +6,7 @@ import { DashboardContent } from "@/components/dashboard-content"
 import { AdminDashboardContent } from "@/components/admin-dashboard-content"
 import { getReportData, getRoleScope } from "@/app/actions/rbac"
 import { getAdminManagementData } from "@/app/actions/admin-management"
+import { DeactivatedBarbershopContent } from "@/components/deactivated-barbershop-content"
 
 interface DashboardPageProps {
   searchParams?: Promise<{ barbershop?: string }>
@@ -22,6 +23,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const params = searchParams ? await searchParams : undefined
   const selectedBarbershopId = params?.barbershop
   const scope = await getRoleScope()
+
+  if (scope.isBarbershopInactive) {
+    return <DeactivatedBarbershopContent userEmail={user.email} />
+  }
 
   if (scope.isSuperAdmin || scope.role === 'admin') {
     const { metrics, topServices, barbershops } = await getReportData(selectedBarbershopId)

@@ -509,8 +509,8 @@ export async function updateBarbershopBySuperAdmin(formData: FormData): Promise<
     return { success: false, error: 'Barbearia fora do seu escopo' }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase
+  const adminSupabase = createAdminClient()
+  const { error } = await adminSupabase
     .from('barbershops')
     .update({
       name,
@@ -538,10 +538,46 @@ export async function deleteBarbershopBySuperAdmin(formData: FormData): Promise<
     return { success: false, error: 'Barbearia fora do seu escopo' }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.from('barbershops').delete().eq('id', barbershopId)
+  const adminSupabase = createAdminClient()
+  const { error } = await adminSupabase.from('barbershops').delete().eq('id', barbershopId)
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+export async function toggleBarbershopActivationBySuperAdmin(formData: FormData): Promise<ActionResult> {
+  const scope = await getRoleScope()
+  if (scope.role !== 'super_admin') {
+    return { success: false, error: 'Apenas Super Admin pode gerenciar ativacao de barbearias' }
+  }
+
+  const barbershopId = String(formData.get('barbershopId') || '').trim()
+  if (!barbershopId) return { success: false, error: 'Barbearia invalida' }
+
+  const adminSupabase = createAdminClient()
+  
+  // Fetch current status
+  const { data: shop, error: fetchError } = await adminSupabase
+    .from('barbershops')
+    .select('id, is_active')
+    .eq('id', barbershopId)
+    .single()
+
+  if (fetchError || !shop) {
+    return { success: false, error: 'Barbearia nao encontrada' }
+  }
+
+  const nextStatus = shop.is_active === false ? true : false
+
+  const { error: updateError } = await adminSupabase
+    .from('barbershops')
+    .update({ is_active: nextStatus })
+    .eq('id', barbershopId)
+
+  if (updateError) return { success: false, error: updateError.message }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+

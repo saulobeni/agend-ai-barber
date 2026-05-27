@@ -8,9 +8,21 @@ export async function getServices(barbershopId?: string): Promise<Service[]> {
   const supabase = await createClient()
 
   const scope = await getRoleScope()
-  // Cliente (role user ou sem role) visualiza todos os servicos publicos.
+  // Cliente (role user ou sem role) visualiza todos os servicos publicos das barbearias ativas.
   if (!scope.role || scope.role === 'user') {
-    let query = supabase.from('services').select('*').order('price', { ascending: true })
+    const { data: activeShops } = await supabase
+      .from('barbershops')
+      .select('id')
+      .eq('is_active', true)
+
+    const activeIds = (activeShops || []).map((s: any) => s.id)
+    if (activeIds.length === 0) return []
+
+    let query = supabase
+      .from('services')
+      .select('*')
+      .in('barbershop_id', activeIds)
+      .order('price', { ascending: true })
 
     if (barbershopId) {
       query = query.eq('barbershop_id', barbershopId)

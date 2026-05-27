@@ -513,7 +513,7 @@ export async function cancelAppointment(appointmentId: string): Promise<{ succes
   return { success: true }
 }
 
-export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
+export async function getBarberAppointments(): Promise<Appointment[]> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -527,7 +527,6 @@ export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
   const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
   if (barberIds.length === 0) return []
 
-  const today = new Date().toISOString().split('T')[0]
   const { data, error } = await supabase
     .from('appointments')
     .select(`
@@ -536,7 +535,7 @@ export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
       service:services(id, name, description, price, duration_minutes, barbershop_id, created_at)
     `)
     .in('barber_id', barberIds)
-    .gte('appointment_date', today)
+    .order('appointment_date', { ascending: true })
     .order('appointment_time', { ascending: true })
 
   if (error) {
@@ -595,6 +594,51 @@ export async function cancelBarberAppointment(appointmentId: string): Promise<{ 
     .in('barber_id', barberIds)
 
   if (error) return { success: false, error: 'Erro ao cancelar atendimento' }
+
+  revalidatePath('/barber/dashboard')
+  revalidatePath('/dashboard')
+  revalidatePath('/meus-agendamentos')
+  return { success: true }
+}
+
+export async function confirmBarberAppointment(appointmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { success: false, error: 'Usuario nao autenticado' }
+
+  const scope = await getRoleScope()
+  if (scope.role !== 'barber') return { success: false, error: 'Sem permissao' }
+
+  const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
+  if (barberIds.length === 0) {
+    return { success: false, error: 'Barbeiro nao vinculado a um cadastro de atendimento' }
+  }
+
+  const { data: ownAppointment, error: ownError } = await supabase
+    .from('appointments')
+    .select('id, status')
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+    .single()
+
+  if (ownError || !ownAppointment) {
+    return { success: false, error: 'Agendamento nao encontrado para este barbeiro' }
+  }
+
+  if (ownAppointment.status !== 'scheduled') {
+    return { success: false, error: 'Somente agendamentos marcados podem ser confirmados' }
+  }
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'completed' })
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+
+  if (error) return { success: false, error: 'Erro ao confirmar atendimento' }
 
   revalidatePath('/barber/dashboard')
   revalidatePath('/dashboard')

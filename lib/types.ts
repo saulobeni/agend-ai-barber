@@ -16,6 +16,7 @@ export interface Barbershop {
   address: string | null
   opening_time: string
   closing_time: string
+  is_active?: boolean
   created_at: string
 }
 

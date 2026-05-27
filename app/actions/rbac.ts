@@ -14,6 +14,7 @@ type ScopeResult = {
   role: UserRole | null
   isSuperAdmin: boolean
   barbershopIds: string[]
+  isBarbershopInactive?: boolean
 }
 
 function normalizeMoney(value: unknown): number {
@@ -32,6 +33,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: null,
       isSuperAdmin: false,
       barbershopIds: [],
+      isBarbershopInactive: false,
     }
   }
 
@@ -50,6 +52,30 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: 'super_admin',
       isSuperAdmin: true,
       barbershopIds: (shops || []).map((s: any) => s.id),
+      isBarbershopInactive: false,
+    }
+  }
+
+  // Check if they are associated with an inactive barbershop
+  const associatedShopIds = rows
+    .map((r: any) => r.barbershop_id)
+    .filter(Boolean) as string[]
+
+  let isBarbershopInactive = false
+  let activeAssociatedShopIds: string[] = []
+
+  if (associatedShopIds.length > 0) {
+    const { data: shops } = await supabase
+      .from('barbershops')
+      .select('id, is_active')
+      .in('id', associatedShopIds)
+
+    const shopList = shops || []
+    activeAssociatedShopIds = shopList.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
+    
+    // If they have associated shops and ALL of them are inactive, then they lose access
+    if (activeAssociatedShopIds.length === 0 && shopList.length > 0) {
+      isBarbershopInactive = true
     }
   }
 
@@ -58,11 +84,13 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (adminShops.length > 0) {
+    const activeAdminShops = adminShops.filter(id => activeAssociatedShopIds.includes(id))
     return {
       userId: user.id,
-      role: 'admin',
+      role: isBarbershopInactive ? null : 'admin',
       isSuperAdmin: false,
-      barbershopIds: adminShops,
+      barbershopIds: activeAdminShops,
+      isBarbershopInactive,
     }
   }
 
@@ -71,11 +99,13 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (barberShops.length > 0) {
+    const activeBarberShops = barberShops.filter(id => activeAssociatedShopIds.includes(id))
     return {
       userId: user.id,
-      role: 'barber',
+      role: isBarbershopInactive ? null : 'barber',
       isSuperAdmin: false,
-      barbershopIds: barberShops,
+      barbershopIds: activeBarberShops,
+      isBarbershopInactive,
     }
   }
 
@@ -86,19 +116,25 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: 'user',
       isSuperAdmin: false,
       barbershopIds: [],
+      isBarbershopInactive: false,
     }
   }
 
   const { data: owned } = await supabase
     .from('barbershops')
-    .select('id')
+    .select('id, is_active')
     .eq('owner_id', user.id)
+
+  const ownedShops = owned || []
+  const activeOwnedShops = ownedShops.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
+  const allOwnedInactive = ownedShops.length > 0 && activeOwnedShops.length === 0
 
   return {
     userId: user.id,
     role: null,
     isSuperAdmin: false,
-    barbershopIds: (owned || []).map((s: any) => s.id),
+    barbershopIds: activeOwnedShops,
+    isBarbershopInactive: allOwnedInactive,
   }
 }
 
