@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Calendar, Clock, X } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cancelAppointment } from "@/app/actions/appointments"
@@ -16,6 +16,10 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Agendado", className: "bg-yellow-500/10 text-yellow-500" },
   completed: { label: "Concluído", className: "bg-blue-500/10 text-blue-500" },
   canceled: { label: "Cancelado", className: "bg-red-500/10 text-red-500" },
+}
+
+function getBarberDisplayName(appointment: Appointment): string {
+  return appointment.barber?.name?.trim() || "Qualquer profissional disponivel"
 }
 
 function formatDate(dateStr: string): string {
@@ -120,6 +124,11 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
                               <span>{appointment.appointment_time.slice(0, 5)}</span>
                             </div>
                           </div>
+
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <User className="h-4 w-4" />
+                            <span>Profissional: {getBarberDisplayName(appointment)}</span>
+                          </div>
                           
                           <p className="text-sm text-muted-foreground">
                             R${appointment.service?.price.toFixed(0) || '0'}
@@ -173,6 +182,11 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
                             <Clock className="h-4 w-4" />
                             <span>{appointment.appointment_time.slice(0, 5)}</span>
                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <User className="h-4 w-4" />
+                          <span>Profissional: {getBarberDisplayName(appointment)}</span>
                         </div>
                       </div>
                     </Card>

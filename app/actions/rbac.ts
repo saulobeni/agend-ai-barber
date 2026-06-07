@@ -21,6 +21,11 @@ function normalizeMoney(value: unknown): number {
   return Number(value ?? 0)
 }
 
+type ReportDataOptions = {
+  startDate?: string
+  endDate?: string
+}
+
 export async function getRoleScope(): Promise<ScopeResult> {
   const supabase = await createClient()
   const {
@@ -141,7 +146,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
 export async function getPostLoginRedirectPath(): Promise<string> {
   const scope = await getRoleScope()
   if (scope.isSuperAdmin || scope.role === 'admin') return '/dashboard'
-  if (scope.role === 'barber') return '/barber/dashboard'
+  if (scope.role === 'barber') return '/dashboard'
   return '/dashboard'
 }
 
@@ -159,7 +164,10 @@ export async function getBarbershopsForScope(): Promise<Barbershop[]> {
   return (data || []) as Barbershop[]
 }
 
-export async function getReportData(selectedBarbershopId?: string): Promise<{
+export async function getReportData(
+  selectedBarbershopId?: string,
+  options?: ReportDataOptions,
+): Promise<{
   scope: ScopeResult
   metrics: DashboardReportMetrics
   topServices: ServiceReportItem[]
@@ -189,44 +197,57 @@ export async function getReportData(selectedBarbershopId?: string): Promise<{
     }
   }
 
-  const { data: appointments } = await supabase
+  let appointmentsQuery = supabase
     .from('appointments')
-    .select('id, service_id, status')
+    .select('id, service_id, status, appointment_date')
     .in('barbershop_id', activeShopIds)
+
+  if (options?.startDate) {
+    appointmentsQuery = appointmentsQuery.gte('appointment_date', options.startDate)
+  }
+
+  if (options?.endDate) {
+    appointmentsQuery = appointmentsQuery.lte('appointment_date', options.endDate)
+  }
+
+  const { data: appointments } = await appointmentsQuery
 
   const { data: services } = await supabase
     .from('services')
-    .select('id, name')
+    .select('id, name, price')
     .in('barbershop_id', activeShopIds)
 
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('appointment_id, amount')
-
   const aptRows = appointments || []
-  const paymentMap = new Map<string, number>()
-  for (const p of payments || []) {
-    paymentMap.set(String((p as any).appointment_id), normalizeMoney((p as any).amount))
-  }
+  const servicePriceById = new Map<string, number>(
+    (services || []).map((s: any) => [String(s.id), normalizeMoney(s.price)]),
+  )
+  const serviceNameById = new Map<string, string>(
+    (services || []).map((s: any) => [String(s.id), String(s.name)]),
+  )
+
+  const isRevenueEligible = (status: string) => status === 'completed' || status === 'scheduled'
 
   const metrics: DashboardReportMetrics = {
     totalAppointments: aptRows.length,
     scheduledAppointments: aptRows.filter((a: any) => a.status === 'scheduled').length,
     completedAppointments: aptRows.filter((a: any) => a.status === 'completed').length,
     canceledAppointments: aptRows.filter((a: any) => a.status === 'canceled').length,
-    totalRevenue: aptRows.reduce((acc: number, a: any) => acc + (paymentMap.get(String(a.id)) || 0), 0),
+    totalRevenue: aptRows.reduce((acc: number, apt: any) => {
+      if (!isRevenueEligible(apt.status)) return acc
+      return acc + (servicePriceById.get(String(apt.service_id)) || 0)
+    }, 0),
   }
-
-  const serviceNameById = new Map<string, string>(
-    (services || []).map((s: any) => [String(s.id), String(s.name)])
-  )
 
   const serviceAgg = new Map<string, { bookings: number; revenue: number }>()
   for (const apt of aptRows as any[]) {
     const sid = String(apt.service_id)
     const item = serviceAgg.get(sid) || { bookings: 0, revenue: 0 }
-    item.bookings += 1
-    item.revenue += paymentMap.get(String(apt.id)) || 0
+    if (apt.status !== 'canceled') {
+      item.bookings += 1
+    }
+    if (isRevenueEligible(apt.status)) {
+      item.revenue += servicePriceById.get(sid) || 0
+    }
     serviceAgg.set(sid, item)
   }
 
@@ -241,6 +262,14 @@ export async function getReportData(selectedBarbershopId?: string): Promise<{
     .slice(0, 8)
 
   return { scope, metrics, topServices, barbershops }
+}
+
+export async function fetchAdminReportData(
+  startDate: string,
+  endDate: string,
+  selectedBarbershopId?: string,
+) {
+  return getReportData(selectedBarbershopId, { startDate, endDate })
 }
 
 export async function getUsersAndRolesForManagement() {

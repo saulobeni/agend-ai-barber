@@ -1,20 +1,18 @@
-import Link from 'next/link'
-import { signOut } from '@/app/actions/auth'
+import { UserProfileMenu } from '@/components/user-profile-menu'
+import { AdminReportsSection } from '@/components/admin-reports-section'
 import {
   createUserByAdmin,
   createServiceByAdmin,
   createBarbershopBySuperAdmin,
   updateServiceByAdmin,
   deleteServiceByAdmin,
-  updateBarberByAdmin,
-  deleteBarberByAdmin,
   updateUserByAdmin,
   deleteUserByAdmin,
   updateBarbershopBySuperAdmin,
   deleteBarbershopBySuperAdmin,
   toggleBarbershopActivationBySuperAdmin,
 } from '@/app/actions/admin-management'
-import type { Barber, Barbershop, DashboardReportMetrics, Service, ServiceReportItem, UserRole } from '@/lib/types'
+import type { Barbershop, DashboardReportMetrics, Service, ServiceReportItem, UserRole } from '@/lib/types'
 
 type RoleItem = {
   id: string
@@ -27,12 +25,14 @@ type RoleItem = {
 interface AdminDashboardContentProps {
   role: UserRole
   userEmail?: string
+  userFullName?: string | null
   metrics: DashboardReportMetrics
   topServices: ServiceReportItem[]
+  reportStartDate?: string
+  reportEndDate?: string
   selectedBarbershopId?: string
   barbershops: Barbershop[]
   roles?: RoleItem[]
-  barbers?: Barber[]
   services?: Service[]
   users?: Array<{
     id: string
@@ -56,12 +56,14 @@ function formatCurrency(value: number) {
 export function AdminDashboardContent({
   role,
   userEmail,
+  userFullName,
   metrics,
   topServices,
+  reportStartDate,
+  reportEndDate,
   selectedBarbershopId,
   barbershops,
   roles = [],
-  barbers = [],
   services = [],
   users = [],
   canManageRoles = false,
@@ -70,10 +72,6 @@ export function AdminDashboardContent({
   const barbershopNameById = new Map(barbershops.map((shop) => [shop.id, shop.name]))
   const userById = new Map(users.map((item) => [item.id, item]))
   const isSuperAdmin = role === 'super_admin'
-  const totalBookings = topServices.reduce((sum, item) => sum + item.bookings, 0)
-  const adminCount = roles.filter((item) => item.role === 'admin').length
-  const barberCount = barbers.length
-  const serviceCount = services.length
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,67 +83,20 @@ export function AdminDashboardContent({
               {role === 'super_admin' ? 'Super Admin' : 'Admin'} {userEmail ? `- ${userEmail}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/meus-agendamentos" className="text-sm text-muted-foreground hover:text-foreground">
-              Agendamentos
-            </Link>
-            <form action={signOut}>
-              <button className="text-sm text-muted-foreground hover:text-foreground">Sair</button>
-            </form>
-          </div>
+          <UserProfileMenu userEmail={userEmail} userFullName={userFullName} />
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {!isSuperAdmin && (
-          <>
-            <section className="space-y-3">
-              <h2 className="text-2xl font-semibold text-foreground">Relatorios</h2>
-              <p className="text-sm text-muted-foreground">
-                {barbershopName
-                  ? `Visualizando dados da barbearia: ${barbershopName}`
-                  : 'Visualizando dados das suas barbearias.'}
-              </p>
-            </section>
-
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <MetricCard title="Total de agendamentos" value={String(metrics.totalAppointments)} />
-              <MetricCard title="Agendados" value={String(metrics.scheduledAppointments)} />
-              <MetricCard title="Concluidos" value={String(metrics.completedAppointments)} />
-              <MetricCard title="Cancelados" value={String(metrics.canceledAppointments)} />
-              <MetricCard title="Receita" value={formatCurrency(metrics.totalRevenue)} />
-            </section>
-
-            <section className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-4">Servicos mais pedidos</h3>
-              {topServices.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum dado encontrado no periodo atual.</p>
-              ) : (
-                <div className="overflow-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-muted-foreground border-b border-border">
-                        <th className="py-2">Servico</th>
-                        <th className="py-2">Pedidos</th>
-                        <th className="py-2">Receita</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topServices.map((item) => (
-                        <tr key={item.service_id} className="border-b border-border/50">
-                          <td className="py-2">{item.service_name}</td>
-                          <td className="py-2">{item.bookings}</td>
-                          <td className="py-2">
-                            {formatCurrency(item.revenue)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          </>
+        {!isSuperAdmin && reportStartDate && reportEndDate && (
+          <AdminReportsSection
+            initialMetrics={metrics}
+            initialTopServices={topServices}
+            initialStartDate={reportStartDate}
+            initialEndDate={reportEndDate}
+            barbershopName={barbershopName}
+            selectedBarbershopId={selectedBarbershopId}
+          />
         )}
 
         {canManageRoles && (
@@ -211,7 +162,7 @@ export function AdminDashboardContent({
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 gap-6 ${isSuperAdmin ? 'max-w-xl' : 'lg:grid-cols-2'}`}>
               <div className="bg-card border border-border rounded-lg p-4">
                 <h3 className="text-lg font-semibold mb-4">
                   {role === 'super_admin' ? 'Cadastrar Administrador' : 'Cadastrar usuario (Admin ou Barber)'}
@@ -275,112 +226,54 @@ export function AdminDashboardContent({
                 </form>
               </div>
 
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
-                <form action={createServiceByAdmin as any} className="space-y-3">
-                  {role === 'super_admin' && (
+              {!isSuperAdmin && (
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
+                  <form action={createServiceByAdmin as any} className="space-y-3">
                     <div>
-                      <label className="block text-sm mb-1">Barbearia Associada</label>
-                      <select name="barbershopId" className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm" required>
-                        <option value="">Selecione uma barbearia</option>
-                        {barbershops.map((shop) => (
-                          <option key={shop.id} value={shop.id}>{shop.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-sm mb-1">Nome</label>
-                    <input
-                      name="name"
-                      type="text"
-                      required
-                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                      placeholder="Ex.: Corte premium"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm mb-1">Preco (R$)</label>
+                      <label className="block text-sm mb-1">Nome</label>
                       <input
-                        name="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
+                        name="name"
+                        type="text"
                         required
                         className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        placeholder="Ex.: Corte premium"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm mb-1">Duracao (min)</label>
-                      <input
-                        name="durationMinutes"
-                        type="number"
-                        min="1"
-                        step="1"
-                        required
-                        className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm mb-1">Preco (R$)</label>
+                        <input
+                          name="price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Duracao (min)</label>
+                        <input
+                          name="durationMinutes"
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                          className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                    Cadastrar servico
-                  </button>
-                </form>
-              </div>
+                    <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
+                      Cadastrar servico
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
 
             {!isSuperAdmin && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-4">Barbeiros cadastrados</h3>
-                  {barbers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum barbeiro cadastrado no seu escopo.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
-                      {barbers.map((barber) => (
-                        <div key={barber.id} className="text-sm border border-border rounded-md p-2">
-                          <div className="font-medium">{barber.name}</div>
-                          <div className="text-muted-foreground">
-                            barbearia: {barbershopNameById.get(barber.barbershop_id) || 'Nao informada'}
-                          </div>
-                          <div className="mt-2 flex gap-2">
-                            <details className="group">
-                              <summary className="list-none cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs inline-block">
-                                Editar
-                              </summary>
-                              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                                <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
-                                  <div className="text-sm font-semibold">Editar barbeiro</div>
-                                  <form action={updateBarberByAdmin as any} className="space-y-3">
-                                    <input type="hidden" name="barberId" value={barber.id} />
-                                    <input
-                                      name="name"
-                                      defaultValue={barber.name}
-                                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                                    />
-                                    <div className="flex gap-2">
-                                      <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                                        Salvar
-                                      </button>
-                                    </div>
-                                  </form>
-                                </div>
-                              </div>
-                            </details>
-                            <form action={deleteBarberByAdmin as any}>
-                              <input type="hidden" name="barberId" value={barber.id} />
-                              <button className="bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs">
-                                Excluir
-                              </button>
-                            </form>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-card border border-border rounded-lg p-4">
                   <h3 className="text-lg font-semibold mb-4">Usuarios</h3>
                   {roles.length === 0 ? (
@@ -435,18 +328,21 @@ export function AdminDashboardContent({
                                 <input
                                   name="fullName"
                                   defaultValue={user?.full_name || ''}
+                                  placeholder="Ex.: Joao da Silva"
                                   className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                 />
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                   <input
                                     name="username"
                                     defaultValue={user?.username || ''}
+                                    placeholder="Ex.: joao.silva"
                                     className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                   />
                                   <input
                                     name="email"
                                     type="email"
                                     defaultValue={user?.email || ''}
+                                    placeholder="Ex.: joao@email.com"
                                     className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                   />
                                   <select
@@ -501,7 +397,9 @@ export function AdminDashboardContent({
                     <p className="text-sm text-muted-foreground">Nenhum servico cadastrado no seu escopo.</p>
                   ) : (
                     <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
-                      {services.map((service) => (
+                      {services.map((service) => {
+                        const editServiceModalId = `edit-service-${service.id}`
+                        return (
                         <div key={service.id} className="text-sm border border-border rounded-md p-2">
                           <div className="font-medium">{service.name}</div>
                           <div className="text-muted-foreground">
@@ -511,45 +409,69 @@ export function AdminDashboardContent({
                             barbearia: {barbershopNameById.get(service.barbershop_id) || 'Nao informada'}
                           </div>
                           <div className="mt-2 flex gap-2">
-                            <details className="group">
-                              <summary className="list-none cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs inline-block">
-                                Editar
-                              </summary>
-                              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                                <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                            <label
+                              htmlFor={editServiceModalId}
+                              className="cursor-pointer bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs"
+                            >
+                              Editar
+                            </label>
+
+                            <input id={editServiceModalId} type="checkbox" className="peer/edit-service hidden" />
+                            <div className="fixed inset-0 z-50 hidden peer-checked/edit-service:flex items-center justify-center p-4">
+                              <label htmlFor={editServiceModalId} className="absolute inset-0 bg-black/50" />
+                              <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
+                                <div className="flex items-center justify-between">
                                   <div className="text-sm font-semibold">Editar servico</div>
-                                  <form action={updateServiceByAdmin as any} className="space-y-3">
-                                    <input type="hidden" name="serviceId" value={service.id} />
+                                  <label
+                                    htmlFor={editServiceModalId}
+                                    className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none"
+                                    aria-label="Fechar"
+                                  >
+                                    x
+                                  </label>
+                                </div>
+                                <form action={updateServiceByAdmin as any} className="space-y-3">
+                                  <input type="hidden" name="serviceId" value={service.id} />
+                                  <input
+                                    name="name"
+                                    defaultValue={service.name}
+                                    placeholder="Ex.: Corte premium"
+                                    className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
                                     <input
-                                      name="name"
-                                      defaultValue={service.name}
+                                      name="price"
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      defaultValue={service.price}
+                                      placeholder="Preco (R$)"
                                       className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                     />
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <input
-                                        name="price"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        defaultValue={service.price}
-                                        className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                                      />
-                                      <input
-                                        name="durationMinutes"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        defaultValue={service.duration_minutes}
-                                        className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                                      />
-                                    </div>
+                                    <input
+                                      name="durationMinutes"
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      defaultValue={service.duration_minutes}
+                                      placeholder="Duracao (min)"
+                                      className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
                                     <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
                                       Salvar
                                     </button>
-                                  </form>
-                                </div>
+                                    <label
+                                      htmlFor={editServiceModalId}
+                                      className="cursor-pointer border border-border px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground"
+                                    >
+                                      Cancelar
+                                    </label>
+                                  </div>
+                                </form>
                               </div>
-                            </details>
+                            </div>
                             <form action={deleteServiceByAdmin as any}>
                               <input type="hidden" name="serviceId" value={service.id} />
                               <button className="bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs">
@@ -558,7 +480,8 @@ export function AdminDashboardContent({
                             </form>
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -701,15 +624,6 @@ export function AdminDashboardContent({
           </section>
         )}
       </main>
-    </div>
-  )
-}
-
-function MetricCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-2xl font-semibold text-foreground mt-1">{value}</div>
     </div>
   )
 }

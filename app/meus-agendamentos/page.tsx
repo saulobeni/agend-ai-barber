@@ -17,7 +17,7 @@ export default async function MeusAgendamentosPage() {
     redirect("/dashboard")
   }
   if (scope.role === "barber") {
-    redirect("/barber/dashboard")
+    redirect("/dashboard")
   }
 
   const appointments = await getUserAppointments()
