@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServices } from "@/app/actions/services"
-import { getNextAppointment } from "@/app/actions/appointments"
+import { getBarberAppointments, getNextAppointment } from "@/app/actions/appointments"
 import { DashboardContent } from "@/components/dashboard-content"
 import { AdminDashboardContent } from "@/components/admin-dashboard-content"
+import { getProfile } from "@/app/actions/auth"
 import { getReportData, getRoleScope } from "@/app/actions/rbac"
+import { getDefaultReportDateRange } from "@/lib/report-date"
 import { getAdminManagementData } from "@/app/actions/admin-management"
+import { DeactivatedBarbershopContent } from "@/components/deactivated-barbershop-content"
+import { BarberDashboardContent } from "@/components/barber-dashboard-content"
 
 interface DashboardPageProps {
   searchParams?: Promise<{ barbershop?: string }>
@@ -23,22 +27,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedBarbershopId = params?.barbershop
   const scope = await getRoleScope()
 
+  if (scope.isBarbershopInactive) {
+    return <DeactivatedBarbershopContent userEmail={user.email} />
+  }
+
   if (scope.isSuperAdmin || scope.role === 'admin') {
-    const { metrics, topServices, barbershops } = await getReportData(selectedBarbershopId)
-    const management = (scope.role === 'admin' || scope.isSuperAdmin)
-      ? await getAdminManagementData()
-      : { roles: [], barbers: [], services: [], users: [] }
+    const reportDateRange = scope.role === 'admin' ? getDefaultReportDateRange() : undefined
+    const [{ metrics, topServices, barbershops }, profile, management] = await Promise.all([
+      getReportData(selectedBarbershopId, reportDateRange),
+      getProfile(),
+      (scope.role === 'admin' || scope.isSuperAdmin)
+        ? getAdminManagementData()
+        : Promise.resolve({ roles: [], barbers: [], services: [], users: [] }),
+    ])
 
     return (
       <AdminDashboardContent
         role={scope.isSuperAdmin ? 'super_admin' : 'admin'}
         userEmail={user.email}
+        userFullName={profile?.full_name}
         metrics={metrics}
         topServices={topServices}
+        reportStartDate={reportDateRange?.startDate}
+        reportEndDate={reportDateRange?.endDate}
         selectedBarbershopId={selectedBarbershopId}
         barbershops={barbershops}
         roles={management.roles}
-        barbers={management.barbers}
         services={management.services}
         users={management.users}
         canManageRoles={scope.role === 'admin' || scope.isSuperAdmin}
@@ -47,7 +61,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   if (scope.role === 'barber') {
-    redirect('/barber/dashboard')
+    const [appointments, profile] = await Promise.all([
+      getBarberAppointments(),
+      getProfile(),
+    ])
+    return (
+      <BarberDashboardContent
+        appointments={appointments}
+        userEmail={user.email}
+        userFullName={profile?.full_name}
+      />
+    )
   }
 
   const { getBarbershops } = await import("@/app/actions/barbershops")

@@ -68,6 +68,54 @@ export async function signOut() {
   redirect('/login')
 }
 
+export async function changePassword(formData: FormData) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    return { error: 'Usuario nao autenticado' }
+  }
+
+  const currentPassword = String(formData.get('currentPassword') || '')
+  const newPassword = String(formData.get('newPassword') || '')
+  const confirmPassword = String(formData.get('confirmPassword') || '')
+
+  if (!currentPassword) {
+    return { error: 'Senha atual obrigatoria' }
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return { error: 'Nova senha deve ter pelo menos 6 caracteres' }
+  }
+
+  if (newPassword !== confirmPassword) {
+    return { error: 'A confirmacao da nova senha nao confere' }
+  }
+
+  if (currentPassword === newPassword) {
+    return { error: 'A nova senha deve ser diferente da senha atual' }
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  })
+
+  if (signInError) {
+    return { error: 'Senha atual incorreta' }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true }
+}
+
 export async function getUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

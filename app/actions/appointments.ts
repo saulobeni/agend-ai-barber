@@ -420,16 +420,46 @@ export async function getUserAppointments(): Promise<Appointment[]> {
     return []
   }
 
-  return (data || []).map((apt: any) => ({
-    ...apt,
-    service: apt?.service
-      ? {
-          ...apt.service,
-          price: Number(apt.service.price),
-          duration_minutes: Number(apt.service.duration_minutes),
-        }
-      : undefined,
-  }))
+  const rows = data || []
+  const missingBarberIds = [
+    ...new Set(
+      rows
+        .filter((apt: any) => !apt?.barber?.name && apt?.barber_id)
+        .map((apt: any) => String(apt.barber_id)),
+    ),
+  ]
+
+  const barberMap = new Map<string, Barber>()
+
+  if (missingBarberIds.length > 0) {
+    const adminSupabase = createAdminClient()
+    const { data: barbers } = await adminSupabase
+      .from('barbers')
+      .select('id, name, barbershop_id, created_at')
+      .in('id', missingBarberIds)
+
+    for (const barber of barbers || []) {
+      barberMap.set(String((barber as any).id), barber as Barber)
+    }
+  }
+
+  return rows.map((apt: any) => {
+    const barberFromJoin = apt?.barber ? { ...apt.barber } : undefined
+    const barberFromLookup = apt?.barber_id ? barberMap.get(String(apt.barber_id)) : undefined
+
+    return {
+      ...apt,
+      appointment_date: String(apt.appointment_date).slice(0, 10),
+      service: apt?.service
+        ? {
+            ...apt.service,
+            price: Number(apt.service.price),
+            duration_minutes: Number(apt.service.duration_minutes),
+          }
+        : undefined,
+      barber: barberFromJoin || barberFromLookup,
+    }
+  })
 }
 
 export async function getNextAppointment(): Promise<Appointment | null> {
@@ -469,7 +499,8 @@ export async function getNextAppointment(): Promise<Appointment | null> {
       .from('appointments')
       .select(`
         *,
-        service:services(id, name, price, duration_minutes)
+        service:services(id, name, price, duration_minutes),
+        barber:barbers(id, name, barbershop_id, created_at)
       `)
       .in('client_id', clientIds)
       .gte('appointment_date', today)
@@ -483,8 +514,21 @@ export async function getNextAppointment(): Promise<Appointment | null> {
   }
 
   if (error || !data) return null
+
+  let barber = data?.barber ? { ...data.barber } : undefined
+  if (!barber?.name && data?.barber_id) {
+    const adminSupabase = createAdminClient()
+    const { data: barberRow } = await adminSupabase
+      .from('barbers')
+      .select('id, name, barbershop_id, created_at')
+      .eq('id', data.barber_id)
+      .single()
+    if (barberRow) barber = barberRow as Barber
+  }
+
   return {
     ...data,
+    appointment_date: String(data.appointment_date).slice(0, 10),
     service: data?.service
       ? {
           ...data.service,
@@ -492,6 +536,7 @@ export async function getNextAppointment(): Promise<Appointment | null> {
           duration_minutes: Number(data.service.duration_minutes),
         }
       : undefined,
+    barber,
   }
 }
 
@@ -513,7 +558,7 @@ export async function cancelAppointment(appointmentId: string): Promise<{ succes
   return { success: true }
 }
 
-export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
+export async function getBarberAppointments(): Promise<Appointment[]> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -527,7 +572,6 @@ export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
   const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
   if (barberIds.length === 0) return []
 
-  const today = new Date().toISOString().split('T')[0]
   const { data, error } = await supabase
     .from('appointments')
     .select(`
@@ -536,7 +580,7 @@ export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
       service:services(id, name, description, price, duration_minutes, barbershop_id, created_at)
     `)
     .in('barber_id', barberIds)
-    .gte('appointment_date', today)
+    .order('appointment_date', { ascending: true })
     .order('appointment_time', { ascending: true })
 
   if (error) {
@@ -544,17 +588,46 @@ export async function getBarberAppointmentsForToday(): Promise<Appointment[]> {
     return []
   }
 
-  return (data || []).map((apt: any) => ({
-    ...apt,
-    service: apt?.service
-      ? {
-          ...apt.service,
-          price: Number(apt.service.price),
-          duration_minutes: Number(apt.service.duration_minutes),
-        }
-      : undefined,
-    client: apt?.client ? { ...apt.client } : undefined,
-  }))
+  const rows = data || []
+  const missingClientIds = [
+    ...new Set(
+      rows
+        .filter((apt: any) => !apt?.client?.name && apt?.client_id)
+        .map((apt: any) => String(apt.client_id)),
+    ),
+  ]
+
+  const clientMap = new Map<string, { id: string; name: string; phone: string; barbershop_id: string; created_at: string }>()
+
+  if (missingClientIds.length > 0) {
+    const adminSupabase = createAdminClient()
+    const { data: clients } = await adminSupabase
+      .from('clients')
+      .select('id, name, phone, barbershop_id, created_at')
+      .in('id', missingClientIds)
+
+    for (const client of clients || []) {
+      clientMap.set(String((client as any).id), client as any)
+    }
+  }
+
+  return rows.map((apt: any) => {
+    const clientFromJoin = apt?.client ? { ...apt.client } : undefined
+    const clientFromLookup = apt?.client_id ? clientMap.get(String(apt.client_id)) : undefined
+
+    return {
+      ...apt,
+      appointment_date: String(apt.appointment_date).slice(0, 10),
+      service: apt?.service
+        ? {
+            ...apt.service,
+            price: Number(apt.service.price),
+            duration_minutes: Number(apt.service.duration_minutes),
+          }
+        : undefined,
+      client: clientFromJoin || clientFromLookup,
+    }
+  })
 }
 
 export async function cancelBarberAppointment(appointmentId: string): Promise<{ success: boolean; error?: string }> {
@@ -595,6 +668,51 @@ export async function cancelBarberAppointment(appointmentId: string): Promise<{ 
     .in('barber_id', barberIds)
 
   if (error) return { success: false, error: 'Erro ao cancelar atendimento' }
+
+  revalidatePath('/barber/dashboard')
+  revalidatePath('/dashboard')
+  revalidatePath('/meus-agendamentos')
+  return { success: true }
+}
+
+export async function confirmBarberAppointment(appointmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { success: false, error: 'Usuario nao autenticado' }
+
+  const scope = await getRoleScope()
+  if (scope.role !== 'barber') return { success: false, error: 'Sem permissao' }
+
+  const barberIds = await resolveBarberIdsForCurrentUser(supabase, user.id, scope.barbershopIds)
+  if (barberIds.length === 0) {
+    return { success: false, error: 'Barbeiro nao vinculado a um cadastro de atendimento' }
+  }
+
+  const { data: ownAppointment, error: ownError } = await supabase
+    .from('appointments')
+    .select('id, status')
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+    .single()
+
+  if (ownError || !ownAppointment) {
+    return { success: false, error: 'Agendamento nao encontrado para este barbeiro' }
+  }
+
+  if (ownAppointment.status !== 'scheduled') {
+    return { success: false, error: 'Somente agendamentos marcados podem ser confirmados' }
+  }
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'completed' })
+    .eq('id', appointmentId)
+    .in('barber_id', barberIds)
+
+  if (error) return { success: false, error: 'Erro ao confirmar atendimento' }
 
   revalidatePath('/barber/dashboard')
   revalidatePath('/dashboard')

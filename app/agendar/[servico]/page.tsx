@@ -24,7 +24,7 @@ export default async function AgendarPage({ params }: AgendarPageProps) {
     redirect("/dashboard")
   }
   if (scope.role === "barber") {
-    redirect("/barber/dashboard")
+    redirect("/dashboard")
   }
 
   const service = await getServiceBySlug(servico)

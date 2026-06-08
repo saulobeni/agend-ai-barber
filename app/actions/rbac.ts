@@ -14,10 +14,16 @@ type ScopeResult = {
   role: UserRole | null
   isSuperAdmin: boolean
   barbershopIds: string[]
+  isBarbershopInactive?: boolean
 }
 
 function normalizeMoney(value: unknown): number {
   return Number(value ?? 0)
+}
+
+type ReportDataOptions = {
+  startDate?: string
+  endDate?: string
 }
 
 export async function getRoleScope(): Promise<ScopeResult> {
@@ -32,6 +38,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: null,
       isSuperAdmin: false,
       barbershopIds: [],
+      isBarbershopInactive: false,
     }
   }
 
@@ -50,6 +57,30 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: 'super_admin',
       isSuperAdmin: true,
       barbershopIds: (shops || []).map((s: any) => s.id),
+      isBarbershopInactive: false,
+    }
+  }
+
+  // Check if they are associated with an inactive barbershop
+  const associatedShopIds = rows
+    .map((r: any) => r.barbershop_id)
+    .filter(Boolean) as string[]
+
+  let isBarbershopInactive = false
+  let activeAssociatedShopIds: string[] = []
+
+  if (associatedShopIds.length > 0) {
+    const { data: shops } = await supabase
+      .from('barbershops')
+      .select('id, is_active')
+      .in('id', associatedShopIds)
+
+    const shopList = shops || []
+    activeAssociatedShopIds = shopList.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
+    
+    // If they have associated shops and ALL of them are inactive, then they lose access
+    if (activeAssociatedShopIds.length === 0 && shopList.length > 0) {
+      isBarbershopInactive = true
     }
   }
 
@@ -58,11 +89,13 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (adminShops.length > 0) {
+    const activeAdminShops = adminShops.filter(id => activeAssociatedShopIds.includes(id))
     return {
       userId: user.id,
-      role: 'admin',
+      role: isBarbershopInactive ? null : 'admin',
       isSuperAdmin: false,
-      barbershopIds: adminShops,
+      barbershopIds: activeAdminShops,
+      isBarbershopInactive,
     }
   }
 
@@ -71,11 +104,13 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (barberShops.length > 0) {
+    const activeBarberShops = barberShops.filter(id => activeAssociatedShopIds.includes(id))
     return {
       userId: user.id,
-      role: 'barber',
+      role: isBarbershopInactive ? null : 'barber',
       isSuperAdmin: false,
-      barbershopIds: barberShops,
+      barbershopIds: activeBarberShops,
+      isBarbershopInactive,
     }
   }
 
@@ -86,26 +121,32 @@ export async function getRoleScope(): Promise<ScopeResult> {
       role: 'user',
       isSuperAdmin: false,
       barbershopIds: [],
+      isBarbershopInactive: false,
     }
   }
 
   const { data: owned } = await supabase
     .from('barbershops')
-    .select('id')
+    .select('id, is_active')
     .eq('owner_id', user.id)
+
+  const ownedShops = owned || []
+  const activeOwnedShops = ownedShops.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
+  const allOwnedInactive = ownedShops.length > 0 && activeOwnedShops.length === 0
 
   return {
     userId: user.id,
     role: null,
     isSuperAdmin: false,
-    barbershopIds: (owned || []).map((s: any) => s.id),
+    barbershopIds: activeOwnedShops,
+    isBarbershopInactive: allOwnedInactive,
   }
 }
 
 export async function getPostLoginRedirectPath(): Promise<string> {
   const scope = await getRoleScope()
   if (scope.isSuperAdmin || scope.role === 'admin') return '/dashboard'
-  if (scope.role === 'barber') return '/barber/dashboard'
+  if (scope.role === 'barber') return '/dashboard'
   return '/dashboard'
 }
 
@@ -123,7 +164,10 @@ export async function getBarbershopsForScope(): Promise<Barbershop[]> {
   return (data || []) as Barbershop[]
 }
 
-export async function getReportData(selectedBarbershopId?: string): Promise<{
+export async function getReportData(
+  selectedBarbershopId?: string,
+  options?: ReportDataOptions,
+): Promise<{
   scope: ScopeResult
   metrics: DashboardReportMetrics
   topServices: ServiceReportItem[]
@@ -153,44 +197,57 @@ export async function getReportData(selectedBarbershopId?: string): Promise<{
     }
   }
 
-  const { data: appointments } = await supabase
+  let appointmentsQuery = supabase
     .from('appointments')
-    .select('id, service_id, status')
+    .select('id, service_id, status, appointment_date')
     .in('barbershop_id', activeShopIds)
+
+  if (options?.startDate) {
+    appointmentsQuery = appointmentsQuery.gte('appointment_date', options.startDate)
+  }
+
+  if (options?.endDate) {
+    appointmentsQuery = appointmentsQuery.lte('appointment_date', options.endDate)
+  }
+
+  const { data: appointments } = await appointmentsQuery
 
   const { data: services } = await supabase
     .from('services')
-    .select('id, name')
+    .select('id, name, price')
     .in('barbershop_id', activeShopIds)
 
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('appointment_id, amount')
-
   const aptRows = appointments || []
-  const paymentMap = new Map<string, number>()
-  for (const p of payments || []) {
-    paymentMap.set(String((p as any).appointment_id), normalizeMoney((p as any).amount))
-  }
+  const servicePriceById = new Map<string, number>(
+    (services || []).map((s: any) => [String(s.id), normalizeMoney(s.price)]),
+  )
+  const serviceNameById = new Map<string, string>(
+    (services || []).map((s: any) => [String(s.id), String(s.name)]),
+  )
+
+  const isRevenueEligible = (status: string) => status === 'completed' || status === 'scheduled'
 
   const metrics: DashboardReportMetrics = {
     totalAppointments: aptRows.length,
     scheduledAppointments: aptRows.filter((a: any) => a.status === 'scheduled').length,
     completedAppointments: aptRows.filter((a: any) => a.status === 'completed').length,
     canceledAppointments: aptRows.filter((a: any) => a.status === 'canceled').length,
-    totalRevenue: aptRows.reduce((acc: number, a: any) => acc + (paymentMap.get(String(a.id)) || 0), 0),
+    totalRevenue: aptRows.reduce((acc: number, apt: any) => {
+      if (!isRevenueEligible(apt.status)) return acc
+      return acc + (servicePriceById.get(String(apt.service_id)) || 0)
+    }, 0),
   }
-
-  const serviceNameById = new Map<string, string>(
-    (services || []).map((s: any) => [String(s.id), String(s.name)])
-  )
 
   const serviceAgg = new Map<string, { bookings: number; revenue: number }>()
   for (const apt of aptRows as any[]) {
     const sid = String(apt.service_id)
     const item = serviceAgg.get(sid) || { bookings: 0, revenue: 0 }
-    item.bookings += 1
-    item.revenue += paymentMap.get(String(apt.id)) || 0
+    if (apt.status !== 'canceled') {
+      item.bookings += 1
+    }
+    if (isRevenueEligible(apt.status)) {
+      item.revenue += servicePriceById.get(sid) || 0
+    }
     serviceAgg.set(sid, item)
   }
 
@@ -205,6 +262,14 @@ export async function getReportData(selectedBarbershopId?: string): Promise<{
     .slice(0, 8)
 
   return { scope, metrics, topServices, barbershops }
+}
+
+export async function fetchAdminReportData(
+  startDate: string,
+  endDate: string,
+  selectedBarbershopId?: string,
+) {
+  return getReportData(selectedBarbershopId, { startDate, endDate })
 }
 
 export async function getUsersAndRolesForManagement() {
