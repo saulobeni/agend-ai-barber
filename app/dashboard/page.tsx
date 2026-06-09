@@ -19,9 +19,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect("/login")
-  }
+  if (!user) redirect("/login")
 
   const params = searchParams ? await searchParams : undefined
   const selectedBarbershopId = params?.barbershop
@@ -33,7 +31,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (scope.isSuperAdmin || scope.role === 'admin') {
     const reportDateRange = scope.role === 'admin' ? getDefaultReportDateRange() : undefined
-    const [{ metrics, topServices, barbershops }, profile, management] = await Promise.all([
+    const [{ metrics, topServices, monthlyData, barbershops }, profile, management] = await Promise.all([
       getReportData(selectedBarbershopId, reportDateRange),
       getProfile(),
       (scope.role === 'admin' || scope.isSuperAdmin)
@@ -48,6 +46,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         userFullName={profile?.full_name}
         metrics={metrics}
         topServices={topServices}
+        monthlyData={monthlyData}
         reportStartDate={reportDateRange?.startDate}
         reportEndDate={reportDateRange?.endDate}
         selectedBarbershopId={selectedBarbershopId}
@@ -75,7 +74,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const { getBarbershops } = await import("@/app/actions/barbershops")
-
   const [services, nextAppointment, barbershops] = await Promise.all([
     getServices(selectedBarbershopId),
     getNextAppointment(),
@@ -83,8 +81,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ])
 
   return (
-    <DashboardContent 
-      services={services} 
+    <DashboardContent
+      services={services}
       nextAppointment={nextAppointment}
       userEmail={user.email}
       barbershops={barbershops}

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   Barbershop,
   DashboardReportMetrics,
+  MonthlyRevenueItem,
   ServiceReportItem,
   UserRole,
 } from '@/lib/types'
@@ -26,6 +27,14 @@ type ReportDataOptions = {
   endDate?: string
 }
 
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+function monthLabel(yyyyMM: string): string {
+  const [year, month] = yyyyMM.split('-')
+  const idx = Number(month) - 1
+  return `${MONTH_NAMES[idx]}/${String(year).slice(2)}`
+}
+
 export async function getRoleScope(): Promise<ScopeResult> {
   const supabase = await createClient()
   const {
@@ -33,13 +42,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return {
-      userId: '',
-      role: null,
-      isSuperAdmin: false,
-      barbershopIds: [],
-      isBarbershopInactive: false,
-    }
+    return { userId: '', role: null, isSuperAdmin: false, barbershopIds: [], isBarbershopInactive: false }
   }
 
   const { data: roleRows } = await supabase
@@ -61,11 +64,7 @@ export async function getRoleScope(): Promise<ScopeResult> {
     }
   }
 
-  // Check if they are associated with an inactive barbershop
-  const associatedShopIds = rows
-    .map((r: any) => r.barbershop_id)
-    .filter(Boolean) as string[]
-
+  const associatedShopIds = rows.map((r: any) => r.barbershop_id).filter(Boolean) as string[]
   let isBarbershopInactive = false
   let activeAssociatedShopIds: string[] = []
 
@@ -77,8 +76,6 @@ export async function getRoleScope(): Promise<ScopeResult> {
 
     const shopList = shops || []
     activeAssociatedShopIds = shopList.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
-    
-    // If they have associated shops and ALL of them are inactive, then they lose access
     if (activeAssociatedShopIds.length === 0 && shopList.length > 0) {
       isBarbershopInactive = true
     }
@@ -89,14 +86,8 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (adminShops.length > 0) {
-    const activeAdminShops = adminShops.filter(id => activeAssociatedShopIds.includes(id))
-    return {
-      userId: user.id,
-      role: isBarbershopInactive ? null : 'admin',
-      isSuperAdmin: false,
-      barbershopIds: activeAdminShops,
-      isBarbershopInactive,
-    }
+    const activeAdminShops = adminShops.filter((id: string) => activeAssociatedShopIds.includes(id))
+    return { userId: user.id, role: isBarbershopInactive ? null : 'admin', isSuperAdmin: false, barbershopIds: activeAdminShops, isBarbershopInactive }
   }
 
   const barberShops = rows
@@ -104,43 +95,21 @@ export async function getRoleScope(): Promise<ScopeResult> {
     .map((r: any) => String(r.barbershop_id))
 
   if (barberShops.length > 0) {
-    const activeBarberShops = barberShops.filter(id => activeAssociatedShopIds.includes(id))
-    return {
-      userId: user.id,
-      role: isBarbershopInactive ? null : 'barber',
-      isSuperAdmin: false,
-      barbershopIds: activeBarberShops,
-      isBarbershopInactive,
-    }
+    const activeBarberShops = barberShops.filter((id: string) => activeAssociatedShopIds.includes(id))
+    return { userId: user.id, role: isBarbershopInactive ? null : 'barber', isSuperAdmin: false, barbershopIds: activeBarberShops, isBarbershopInactive }
   }
 
   const hasUserRole = rows.some((r: any) => r.role === 'user')
   if (hasUserRole) {
-    return {
-      userId: user.id,
-      role: 'user',
-      isSuperAdmin: false,
-      barbershopIds: [],
-      isBarbershopInactive: false,
-    }
+    return { userId: user.id, role: 'user', isSuperAdmin: false, barbershopIds: [], isBarbershopInactive: false }
   }
 
-  const { data: owned } = await supabase
-    .from('barbershops')
-    .select('id, is_active')
-    .eq('owner_id', user.id)
-
+  const { data: owned } = await supabase.from('barbershops').select('id, is_active').eq('owner_id', user.id)
   const ownedShops = owned || []
   const activeOwnedShops = ownedShops.filter((s: any) => s.is_active !== false).map((s: any) => s.id)
   const allOwnedInactive = ownedShops.length > 0 && activeOwnedShops.length === 0
 
-  return {
-    userId: user.id,
-    role: null,
-    isSuperAdmin: false,
-    barbershopIds: activeOwnedShops,
-    isBarbershopInactive: allOwnedInactive,
-  }
+  return { userId: user.id, role: null, isSuperAdmin: false, barbershopIds: activeOwnedShops, isBarbershopInactive: allOwnedInactive }
 }
 
 export async function getPostLoginRedirectPath(): Promise<string> {
@@ -171,6 +140,7 @@ export async function getReportData(
   scope: ScopeResult
   metrics: DashboardReportMetrics
   topServices: ServiceReportItem[]
+  monthlyData: MonthlyRevenueItem[]
   barbershops: Barbershop[]
 }> {
   const supabase = await createClient()
@@ -182,33 +152,23 @@ export async function getReportData(
       ? [selectedBarbershopId]
       : scope.barbershopIds
 
-  if (activeShopIds.length === 0) {
-    return {
-      scope,
-      barbershops,
-      metrics: {
-        totalAppointments: 0,
-        scheduledAppointments: 0,
-        completedAppointments: 0,
-        canceledAppointments: 0,
-        totalRevenue: 0,
-      },
-      topServices: [],
-    }
+  const emptyResult = {
+    scope,
+    barbershops,
+    metrics: { totalAppointments: 0, scheduledAppointments: 0, completedAppointments: 0, canceledAppointments: 0, totalRevenue: 0 },
+    topServices: [],
+    monthlyData: [],
   }
+
+  if (activeShopIds.length === 0) return emptyResult
 
   let appointmentsQuery = supabase
     .from('appointments')
     .select('id, service_id, status, appointment_date')
     .in('barbershop_id', activeShopIds)
 
-  if (options?.startDate) {
-    appointmentsQuery = appointmentsQuery.gte('appointment_date', options.startDate)
-  }
-
-  if (options?.endDate) {
-    appointmentsQuery = appointmentsQuery.lte('appointment_date', options.endDate)
-  }
+  if (options?.startDate) appointmentsQuery = appointmentsQuery.gte('appointment_date', options.startDate)
+  if (options?.endDate) appointmentsQuery = appointmentsQuery.lte('appointment_date', options.endDate)
 
   const { data: appointments } = await appointmentsQuery
 
@@ -238,16 +198,13 @@ export async function getReportData(
     }, 0),
   }
 
+  // Serviços mais pedidos
   const serviceAgg = new Map<string, { bookings: number; revenue: number }>()
   for (const apt of aptRows as any[]) {
     const sid = String(apt.service_id)
     const item = serviceAgg.get(sid) || { bookings: 0, revenue: 0 }
-    if (apt.status !== 'canceled') {
-      item.bookings += 1
-    }
-    if (isRevenueEligible(apt.status)) {
-      item.revenue += servicePriceById.get(sid) || 0
-    }
+    if (apt.status !== 'canceled') item.bookings += 1
+    if (isRevenueEligible(apt.status)) item.revenue += servicePriceById.get(sid) || 0
     serviceAgg.set(sid, item)
   }
 
@@ -261,7 +218,22 @@ export async function getReportData(
     .sort((a, b) => b.bookings - a.bookings)
     .slice(0, 8)
 
-  return { scope, metrics, topServices, barbershops }
+  // Receita por mês
+  const monthlyMap = new Map<string, { revenue: number; appointments: number }>()
+  for (const apt of aptRows as any[]) {
+    const month = String(apt.appointment_date || '').slice(0, 7) // "YYYY-MM"
+    if (!month || month.length < 7) continue
+    const existing = monthlyMap.get(month) || { revenue: 0, appointments: 0 }
+    if (apt.status !== 'canceled') existing.appointments += 1
+    if (isRevenueEligible(apt.status)) existing.revenue += servicePriceById.get(String(apt.service_id)) || 0
+    monthlyMap.set(month, existing)
+  }
+
+  const monthlyData: MonthlyRevenueItem[] = Array.from(monthlyMap.entries())
+    .map(([month, values]) => ({ month, label: monthLabel(month), ...values }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+
+  return { scope, metrics, topServices, monthlyData, barbershops }
 }
 
 export async function fetchAdminReportData(
@@ -283,11 +255,7 @@ export async function getUsersAndRolesForManagement() {
     supabase.from('barbershops').select('id, name').order('name', { ascending: true }),
   ])
 
-  return {
-    users: profiles || [],
-    roles: roles || [],
-    barbershops: barbershops || [],
-  }
+  return { users: profiles || [], roles: roles || [], barbershops: barbershops || [] }
 }
 
 export async function assignRole(formData: FormData) {
@@ -299,12 +267,8 @@ export async function assignRole(formData: FormData) {
   const barbershopId = String(formData.get('barbershopId') || '')
 
   if (!userId) return { success: false, error: 'Usuario obrigatorio' }
-  if (role !== 'admin' && role !== 'super_admin') {
-    return { success: false, error: 'Role invalida' }
-  }
-  if (role === 'admin' && !barbershopId) {
-    return { success: false, error: 'Barbearia obrigatoria para admin' }
-  }
+  if (role !== 'admin' && role !== 'super_admin') return { success: false, error: 'Role invalida' }
+  if (role === 'admin' && !barbershopId) return { success: false, error: 'Barbearia obrigatoria para admin' }
 
   const supabase = await createClient()
   const { error } = await supabase.from('user_roles').insert({

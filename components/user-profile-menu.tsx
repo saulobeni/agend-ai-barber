@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, KeyRound, LogOut } from "lucide-react"
+import Link from "next/link"
+import { ChevronDown, KeyRound, LogOut, UserCircle } from "lucide-react"
 import { signOut, changePassword } from "@/app/actions/auth"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -31,17 +32,13 @@ interface UserProfileMenuProps {
 function getInitials(fullName?: string | null, email?: string): string {
   if (fullName?.trim()) {
     const parts = fullName.trim().split(/\s+/).filter(Boolean)
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-    }
+    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
     return parts[0].slice(0, 2).toUpperCase()
   }
-
   if (email) {
     const localPart = email.split("@")[0] || email
     return localPart.slice(0, 2).toUpperCase()
   }
-
   return "U"
 }
 
@@ -119,6 +116,12 @@ export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProp
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/perfil" className="flex items-center gap-2 cursor-pointer w-full">
+              <UserCircle className="size-4" />
+              Meu Perfil
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault()
@@ -164,52 +167,20 @@ export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProp
                 {passwordSuccess}
               </div>
             )}
-
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Senha atual</Label>
-              <Input
-                id="currentPassword"
-                name="currentPassword"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="Digite sua senha atual"
-              />
+              <Input id="currentPassword" name="currentPassword" type="password" required autoComplete="current-password" placeholder="Digite sua senha atual" />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="newPassword">Nova senha</Label>
-              <Input
-                id="newPassword"
-                name="newPassword"
-                type="password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                placeholder="Minimo de 6 caracteres"
-              />
+              <Input id="newPassword" name="newPassword" type="password" required minLength={6} autoComplete="new-password" placeholder="Minimo de 6 caracteres" />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar nova senha</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                placeholder="Repita a nova senha"
-              />
+              <Input id="confirmPassword" name="confirmPassword" type="password" required minLength={6} autoComplete="new-password" placeholder="Repita a nova senha" />
             </div>
-
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handlePasswordDialogChange(false)}
-                disabled={passwordLoading}
-              >
+              <Button type="button" variant="outline" onClick={() => handlePasswordDialogChange(false)} disabled={passwordLoading}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={passwordLoading}>

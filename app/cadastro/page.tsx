@@ -17,10 +17,10 @@ export default function CadastroPage() {
     e.preventDefault()
     setError("")
     setLoading(true)
-    
+
     const formData = new FormData(e.currentTarget)
     const result = await signup(formData)
-    
+
     if (result?.error) {
       setError(result.error)
       setLoading(false)
@@ -33,7 +33,6 @@ export default function CadastroPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="bg-card rounded-xl p-8 shadow-lg">
-          {/* Logo */}
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="bg-primary p-2 rounded-lg">
               <Scissors className="h-6 w-6 text-primary-foreground" />
@@ -44,7 +43,7 @@ export default function CadastroPage() {
               <span className="text-primary">Barber</span>
             </h1>
           </div>
-          
+
           <p className="text-muted-foreground text-center mb-6">
             Crie sua conta para agendar
           </p>
@@ -86,15 +85,19 @@ export default function CadastroPage() {
 
             <div className="space-y-2">
               <label htmlFor="phone" className="text-sm font-medium text-foreground">
-                Telefone
+                Telefone <span className="text-destructive">*</span>
               </label>
               <Input
                 id="phone"
                 name="phone"
                 type="tel"
                 placeholder="(00) 00000-0000"
+                required
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
               />
+              <p className="text-xs text-muted-foreground">
+                Necessário para confirmar seus agendamentos
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -112,7 +115,7 @@ export default function CadastroPage() {
               />
             </div>
 
-            <Button 
+            <Button
               type="submit"
               disabled={loading}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3"

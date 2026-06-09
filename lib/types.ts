@@ -1,5 +1,4 @@
 // Types alinhados ao SQL em `scripts/001_create_schema.sql`
-// (seu esquema usa: `appointment_time`, `block_date`, status `scheduled/completed/canceled`, etc.)
 
 export interface Profile {
   id: string
@@ -107,4 +106,11 @@ export interface ServiceReportItem {
   service_name: string
   bookings: number
   revenue: number
+}
+
+export interface MonthlyRevenueItem {
+  month: string       
+  label: string   
+  revenue: number
+  appointments: number
 }
