@@ -74,10 +74,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const { getBarbershops } = await import("@/app/actions/barbershops")
-  const [services, nextAppointment, barbershops] = await Promise.all([
+  const [services, nextAppointment, barbershops, profile] = await Promise.all([
     getServices(selectedBarbershopId),
     getNextAppointment(),
-    getBarbershops()
+    getBarbershops(),
+    getProfile(),
   ])
 
   return (
@@ -85,6 +86,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       services={services}
       nextAppointment={nextAppointment}
       userEmail={user.email}
+      userFullName={profile?.full_name}
       barbershops={barbershops}
       selectedBarbershopId={selectedBarbershopId}
     />
