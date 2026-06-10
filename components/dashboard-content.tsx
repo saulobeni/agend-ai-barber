@@ -1,16 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { Scissors, Calendar, Clock, LogOut, User, MapPin } from "lucide-react"
+import { Scissors, Calendar, Clock, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { signOut } from "@/app/actions/auth"
+import { UserProfileMenu } from "@/components/user-profile-menu"
 import type { Service, Appointment, Barbershop } from "@/lib/types"
 
 interface DashboardContentProps {
   services: Service[]
   nextAppointment: Appointment | null
   userEmail?: string
+  userFullName?: string | null
   barbershops: Barbershop[]
   selectedBarbershopId?: string
 }
@@ -39,10 +40,35 @@ function formatDuration(minutes: number): string {
   return `${minutes} min`
 }
 
-export function DashboardContent({ services, nextAppointment, userEmail, barbershops, selectedBarbershopId }: DashboardContentProps) {
+function getGreeting(name?: string | null): { greeting: string; subtitle: string } {
+  const hour = new Date().getHours()
+  const firstName = name?.trim().split(' ')[0] || null
+
+  let greeting = ''
+  if (hour >= 5 && hour < 12) {
+    greeting = firstName ? `Bom dia, ${firstName}!` : 'Bom dia!'
+  } else if (hour >= 12 && hour < 18) {
+    greeting = firstName ? `Boa tarde, ${firstName}!` : 'Boa tarde!'
+  } else {
+    greeting = firstName ? `Boa noite, ${firstName}!` : 'Boa noite!'
+  }
+
+  const subtitles = [
+    'Pronto para agendar seu próximo corte?',
+    'Seu estilo, no horário que preferir.',
+    'Agende em segundos e garanta seu horário.',
+    'Qual vai ser hoje?',
+  ]
+  const subtitle = subtitles[new Date().getDay() % subtitles.length]
+
+  return { greeting, subtitle }
+}
+
+export function DashboardContent({ services, nextAppointment, userEmail, userFullName, barbershops, selectedBarbershopId }: DashboardContentProps) {
+  const { greeting, subtitle } = getGreeting(userFullName)
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -55,33 +81,24 @@ export function DashboardContent({ services, nextAppointment, userEmail, barbers
               <span className="text-primary">Barber</span>
             </h1>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <Link href="/meus-agendamentos" className="text-muted-foreground hover:text-foreground text-sm">
+            <Link href="/meus-agendamentos" className="text-muted-foreground hover:text-foreground text-sm hidden sm:block">
               Meus Agendamentos
             </Link>
-            <form action={signOut}>
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
-            </form>
+            <UserProfileMenu userEmail={userEmail} userFullName={userFullName} />
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero Section */}
         <section className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2 text-balance">
-            Estilo com a precisão.
+          <h2 className="text-3xl font-bold text-foreground mb-2">
+            {greeting}
           </h2>
-          <p className="text-muted-foreground">
-            Agende seu horário em segundos e tenha a melhor experiência de barbearia da cidade.
-          </p>
+          <p className="text-muted-foreground">{subtitle}</p>
         </section>
 
-        {/* Próximo Agendamento */}
         <Card className="bg-card border-border p-4 mb-8">
           <div className="flex items-center gap-2 text-primary mb-2">
             <Calendar className="h-4 w-4" />
@@ -109,10 +126,9 @@ export function DashboardContent({ services, nextAppointment, userEmail, barbers
           )}
         </Card>
 
-        {/* Barbearias */}
         <section className="mb-12">
           <h3 className="text-xl font-semibold text-foreground mb-4">Selecione uma Barbearia</h3>
-          
+
           {barbershops.length === 0 ? (
             <div className="text-muted-foreground text-sm">
               Nenhuma barbearia cadastrada no sistema.
@@ -136,11 +152,10 @@ export function DashboardContent({ services, nextAppointment, userEmail, barbers
           )}
         </section>
 
-        {/* Serviços */}
         {selectedBarbershopId ? (
           <section>
             <h3 className="text-xl font-semibold text-foreground mb-4">Serviços da Barbearia</h3>
-            
+
             {services.length === 0 ? (
               <div className="text-muted-foreground text-sm">
                 Nenhum serviço encontrado para esta barbearia.
@@ -155,12 +170,12 @@ export function DashboardContent({ services, nextAppointment, userEmail, barbers
                         {formatDuration(service.duration_minutes)}
                       </span>
                     </div>
-                    
+
                     <h4 className="text-lg font-semibold text-foreground mb-2">{service.name}</h4>
                     <p className="text-muted-foreground text-sm mb-4">
                       {service.description || 'Serviço de barbearia profissional.'}
                     </p>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-xl font-bold text-primary">
                         {formatPrice(service.price)}
