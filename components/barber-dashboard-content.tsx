@@ -153,7 +153,7 @@ export function BarberDashboardContent({
         <section className="space-y-1">
           <h2 className="text-2xl font-semibold text-foreground">Painel de atendimentos</h2>
           <p className="text-sm text-muted-foreground">
-            Selecione um dia no calendario para visualizar todos os horarios agendados.
+            Selecione um dia no calendario para visualizar todos os horários agendados.
           </p>
         </section>
 
@@ -167,7 +167,7 @@ export function BarberDashboardContent({
           <div className="bg-card border border-border rounded-xl p-4 xl:sticky xl:top-6">
             <div className="flex items-center gap-2 mb-4">
               <CalendarDays className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">Calendario</h3>
+              <h3 className="text-lg font-semibold text-foreground">Calendário</h3>
             </div>
             <div className="flex justify-center">
               <Calendar
@@ -210,7 +210,7 @@ export function BarberDashboardContent({
                   <CalendarDays className="h-10 w-10 text-muted-foreground mb-3" />
                   <p className="text-base font-medium text-foreground">Nenhum agendamento para este dia</p>
                   <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                    Quando houver atendimentos marcados, eles aparecerao aqui em ordem cronologica.
+                    Quando houver atendimentos marcados, eles aparecerão aqui em ordem cronológica.
                   </p>
                 </div>
               ) : (

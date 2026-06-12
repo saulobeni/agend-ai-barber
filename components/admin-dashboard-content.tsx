@@ -104,7 +104,7 @@ export function AdminDashboardContent({
             <div>
               <h2 className="text-2xl font-semibold text-foreground">Cadastros administrativos</h2>
               <p className="text-sm text-muted-foreground">
-                Criacao completa de usuario com senha padrao 123456, sempre vinculada a sua barbearia.
+                Criação completa de usuário com senha padrão 123456, sempre vinculada a sua barbearia.
               </p>
             </div>
 
@@ -165,7 +165,7 @@ export function AdminDashboardContent({
             <div className={`grid grid-cols-1 gap-6 ${isSuperAdmin ? 'max-w-xl' : 'lg:grid-cols-2'}`}>
               <div className="bg-card border border-border rounded-lg p-4">
                 <h3 className="text-lg font-semibold mb-4">
-                  {role === 'super_admin' ? 'Cadastrar Administrador' : 'Cadastrar usuario (Admin ou Barber)'}
+                  {role === 'super_admin' ? 'Cadastrar Administrador' : 'Cadastrar usuário (Admin ou Barber)'}
                 </h3>
                 <form action={createUserByAdmin as any} className="space-y-3">
                   {role === 'super_admin' && (
@@ -186,7 +186,7 @@ export function AdminDashboardContent({
                       type="text"
                       required
                       className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                      placeholder="Ex.: Joao da Silva"
+                      placeholder="Ex.: João da Silva"
                     />
                   </div>
                   <div>
@@ -221,14 +221,14 @@ export function AdminDashboardContent({
                     </div>
                   )}
                   <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                    Criar usuario
+                    Criar usuário
                   </button>
                 </form>
               </div>
 
               {!isSuperAdmin && (
                 <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-4">Cadastrar servico</h3>
+                  <h3 className="text-lg font-semibold mb-4">Cadastrar serviço</h3>
                   <form action={createServiceByAdmin as any} className="space-y-3">
                     <div>
                       <label className="block text-sm mb-1">Nome</label>
@@ -242,7 +242,7 @@ export function AdminDashboardContent({
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-sm mb-1">Preco (R$)</label>
+                        <label className="block text-sm mb-1">Preço (R$)</label>
                         <input
                           name="price"
                           type="number"
@@ -253,7 +253,7 @@ export function AdminDashboardContent({
                         />
                       </div>
                       <div>
-                        <label className="block text-sm mb-1">Duracao (min)</label>
+                        <label className="block text-sm mb-1">Duração (min)</label>
                         <input
                           name="durationMinutes"
                           type="number"
@@ -265,7 +265,7 @@ export function AdminDashboardContent({
                       </div>
                     </div>
                     <button className="bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm">
-                      Cadastrar servico
+                      Cadastrar serviço
                     </button>
                   </form>
                 </div>
@@ -275,9 +275,9 @@ export function AdminDashboardContent({
             {!isSuperAdmin && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-4">Usuarios</h3>
+                  <h3 className="text-lg font-semibold mb-4">Usuários</h3>
                   {roles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum usuario encontrado no escopo.</p>
+                    <p className="text-sm text-muted-foreground">Nenhum usuário encontrado no escopo.</p>
                   ) : (
                     <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
                       {roles.map((r) => (
@@ -289,14 +289,14 @@ export function AdminDashboardContent({
                             return (
                               <>
                           <div className="font-medium">
-                            {user?.full_name || user?.email || 'Usuario sem nome'}
+                            {user?.full_name || user?.email || 'Usuário sem nome'}
                           </div>
                           <div className="text-muted-foreground">
-                            email: {user?.email || 'nao informado'}
+                            email: {user?.email || 'não informado'}
                           </div>
                           <div className="text-muted-foreground">perfil: {r.role}</div>
                           <div className="text-muted-foreground">
-                            barbearia: {r.barbershop_id ? (barbershopNameById.get(r.barbershop_id) || 'Nao informada') : 'todas'}
+                            barbearia: {r.barbershop_id ? (barbershopNameById.get(r.barbershop_id) || 'Não informada') : 'todas'}
                           </div>
                           <div className="mt-2 flex gap-2">
                             <label
@@ -318,7 +318,7 @@ export function AdminDashboardContent({
                             <label htmlFor={editModalId} className="absolute inset-0 bg-black/50" />
                             <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-lg space-y-3">
                               <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold">Editar usuario</div>
+                                <div className="text-sm font-semibold">Editar usuário</div>
                                 <label htmlFor={editModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
                                   x
                                 </label>
@@ -328,7 +328,7 @@ export function AdminDashboardContent({
                                 <input
                                   name="fullName"
                                   defaultValue={user?.full_name || ''}
-                                  placeholder="Ex.: Joao da Silva"
+                                  placeholder="Ex.: João da Silva"
                                   className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                 />
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -366,18 +366,18 @@ export function AdminDashboardContent({
                             <label htmlFor={deleteModalId} className="absolute inset-0 bg-black/50" />
                             <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
                               <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold">Excluir usuario</div>
+                                <div className="text-sm font-semibold">Excluir usuário</div>
                                 <label htmlFor={deleteModalId} className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none">
                                   x
                                 </label>
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                Confirma a exclusao deste usuario?
+                                Confirma a exclusão deste usuário?
                               </p>
                               <form action={deleteUserByAdmin as any}>
                                 <input type="hidden" name="userId" value={r.user_id} />
                                 <button className="bg-destructive text-destructive-foreground px-3 py-2 rounded-md text-sm">
-                                  Confirmar exclusao
+                                  Confirmar exclusão
                                 </button>
                               </form>
                             </div>
@@ -392,9 +392,9 @@ export function AdminDashboardContent({
                 </div>
 
                 <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-4">Servicos cadastrados</h3>
+                  <h3 className="text-lg font-semibold mb-4">Serviços cadastrados</h3>
                   {services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum servico cadastrado no seu escopo.</p>
+                    <p className="text-sm text-muted-foreground">Nenhum serviço cadastrado no seu escopo.</p>
                   ) : (
                     <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground))_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/60">
                       {services.map((service) => {
@@ -406,7 +406,7 @@ export function AdminDashboardContent({
                             {formatCurrency(service.price)} - {service.duration_minutes} min
                           </div>
                           <div className="text-muted-foreground">
-                            barbearia: {barbershopNameById.get(service.barbershop_id) || 'Nao informada'}
+                            barbearia: {barbershopNameById.get(service.barbershop_id) || 'Não informada'}
                           </div>
                           <div className="mt-2 flex gap-2">
                             <label
@@ -421,7 +421,7 @@ export function AdminDashboardContent({
                               <label htmlFor={editServiceModalId} className="absolute inset-0 bg-black/50" />
                               <div className="relative z-10 bg-card border border-border rounded-lg p-4 w-full max-w-md space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <div className="text-sm font-semibold">Editar servico</div>
+                                  <div className="text-sm font-semibold">Editar serviço</div>
                                   <label
                                     htmlFor={editServiceModalId}
                                     className="cursor-pointer text-muted-foreground hover:text-foreground text-lg leading-none"
@@ -445,7 +445,7 @@ export function AdminDashboardContent({
                                       min="0"
                                       step="0.01"
                                       defaultValue={service.price}
-                                      placeholder="Preco (R$)"
+                                      placeholder="Preço (R$)"
                                       className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                     />
                                     <input
@@ -454,7 +454,7 @@ export function AdminDashboardContent({
                                       min="1"
                                       step="1"
                                       defaultValue={service.duration_minutes}
-                                      placeholder="Duracao (min)"
+                                      placeholder="Duração (min)"
                                       className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
                                     />
                                   </div>
@@ -507,9 +507,9 @@ export function AdminDashboardContent({
                             </span>
                           )}
                         </div>
-                        <div className="text-muted-foreground">{shop.address || 'Endereco nao informado'}</div>
+                        <div className="text-muted-foreground">{shop.address || 'Endereço não informado'}</div>
                         <div className="text-muted-foreground">
-                          horario: {shop.opening_time} - {shop.closing_time}
+                          horário: {shop.opening_time} - {shop.closing_time}
                         </div>
                         <div className="mt-2 flex items-center gap-2">
                           <label
@@ -560,7 +560,7 @@ export function AdminDashboardContent({
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm mb-1">Endereco</label>
+                                <label className="block text-sm mb-1">Endereço</label>
                                 <input
                                   name="address"
                                   defaultValue={shop.address || ''}
@@ -605,12 +605,12 @@ export function AdminDashboardContent({
                               </label>
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              Confirma a exclusao da barbearia <span className="font-medium">{shop.name}</span>?
+                              Confirma a exclusão da barbearia <span className="font-medium">{shop.name}</span>?
                             </p>
                             <form action={deleteBarbershopBySuperAdmin as any}>
                               <input type="hidden" name="barbershopId" value={shop.id} />
                               <button className="bg-destructive text-destructive-foreground px-3 py-2 rounded-md text-sm">
-                                Confirmar exclusao
+                                Confirmar exclusão
                               </button>
                             </form>
                           </div>
