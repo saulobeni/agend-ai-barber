@@ -9,7 +9,7 @@ interface DeactivatedBarbershopContentProps {
 export function DeactivatedBarbershopContent({ userEmail }: DeactivatedBarbershopContentProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <div className="max-w-md w-full space-y-8 bg-card border border-border/80 rounded-2xl p-8 shadow-2xl backdrop-blur-md relative overflow-hidden">
+      <div className="max-w-md w-full space-y-8 bg-card border border-border rounded-2xl p-8 shadow-sm relative overflow-hidden">
         {/* Glow effect */}
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-destructive/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />

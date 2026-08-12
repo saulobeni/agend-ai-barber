@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { ArrowLeft, Calendar, Clock, Scissors } from "lucide-react"
+import { Calendar, Clock, Scissors } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createAppointment, getAvailableTimes } from "@/app/actions/appointments"
 import type { Service, Barber } from "@/lib/types"
@@ -160,26 +159,15 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Agendar {service.name}</h1>
-              <p className="text-sm text-muted-foreground">
-                {formatDuration(service.duration_minutes)} · R${service.price.toFixed(0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-foreground">Agendar {service.name}</h1>
+        <p className="text-sm text-muted-foreground">
+          {formatDuration(service.duration_minutes)} · R${service.price.toFixed(0)}
+        </p>
+      </div>
 
-      <main className="container mx-auto px-4 py-8">
-        {error && (
+      {error && (
           <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-3 mb-6 text-sm">
             {error}
           </div>
@@ -369,7 +357,6 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
             </div>
           </div>
         </div>
-      </main>
     </div>
   )
 }

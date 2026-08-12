@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { CalendarDays, Check, Clock, Phone, Scissors, User, X } from "lucide-react"
 import { cancelBarberAppointment, confirmBarberAppointment } from "@/app/actions/appointments"
-import { UserProfileMenu } from "@/components/user-profile-menu"
 import type { Appointment } from "@/lib/types"
 import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
@@ -155,27 +154,13 @@ export function BarberDashboardContent({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Agenda do Barbeiro</h1>
-            <p className="text-sm text-muted-foreground">
-              {userFullName || userEmail || "Barbeiro"}
-              {userEmail && userFullName ? ` - ${userEmail}` : ""}
-            </p>
-          </div>
-          <UserProfileMenu userEmail={userEmail} userFullName={userFullName} />
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <section className="space-y-1">
-          <h2 className="text-2xl font-semibold text-foreground">Painel de atendimentos</h2>
-          <p className="text-sm text-muted-foreground">
-            Selecione um dia no calendario para visualizar todos os horarios agendados.
-          </p>
-        </section>
+    <div className="space-y-6">
+      <section className="space-y-1">
+        <h1 className="text-2xl font-semibold text-foreground">Agenda do Barbeiro</h1>
+        <p className="text-sm text-muted-foreground">
+          Selecione um dia no calendario para visualizar todos os horarios agendados.
+        </p>
+      </section>
 
         {/* Cards de métricas do dia selecionado */}
         {selectedDateKey && (
@@ -323,8 +308,7 @@ export function BarberDashboardContent({
               )}
             </div>
           </div>
-        </section>
-      </main>
+      </section>
     </div>
   )
 }

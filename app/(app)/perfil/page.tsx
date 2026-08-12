@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, User } from "lucide-react"
-import Link from "next/link"
+import { User } from "lucide-react"
 import { toast } from "sonner"
 import { getProfileData, updateProfile } from "@/app/actions/profile"
 import { Button } from "@/components/ui/button"
@@ -46,28 +45,17 @@ export default function PerfilPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground text-sm">Carregando...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/40">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <h1 className="text-xl font-bold text-foreground">Meu Perfil</h1>
-        </div>
-      </header>
+    <div className="max-w-2xl">
+      <h1 className="text-2xl font-semibold text-foreground mb-6">Meu Perfil</h1>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+      <div className="bg-card border border-border rounded-xl p-6 space-y-6">
           {/* Avatar */}
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center">
@@ -127,8 +115,7 @@ export default function PerfilPage() {
               </Button>
             </div>
           </form>
-        </div>
-      </main>
+      </div>
     </div>
   )
 }

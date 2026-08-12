@@ -1,10 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Scissors, Calendar, Clock, MapPin } from "lucide-react"
+import { Calendar, Clock, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { UserProfileMenu } from "@/components/user-profile-menu"
 import type { Service, Appointment, Barbershop } from "@/lib/types"
 
 interface DashboardContentProps {
@@ -68,36 +67,13 @@ export function DashboardContent({ services, nextAppointment, userEmail, userFul
   const { greeting, subtitle } = getGreeting(userFullName)
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary p-2 rounded-lg">
-              <Scissors className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-xl font-bold">
-              <span className="text-foreground">Agenda</span>
-              <span className="text-primary">AI</span>
-              <span className="text-primary">Barber</span>
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link href="/meus-agendamentos" className="text-muted-foreground hover:text-foreground text-sm hidden sm:block">
-              Meus Agendamentos
-            </Link>
-            <UserProfileMenu userEmail={userEmail} userFullName={userFullName} />
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <section className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">
-            {greeting}
-          </h2>
-          <p className="text-muted-foreground">{subtitle}</p>
-        </section>
+    <>
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold text-foreground mb-2">
+          {greeting}
+        </h2>
+        <p className="text-muted-foreground">{subtitle}</p>
+      </section>
 
         <Card className="bg-card border-border p-4 mb-8">
           <div className="flex items-center gap-2 text-primary mb-2">
@@ -192,7 +168,6 @@ export function DashboardContent({ services, nextAppointment, userEmail, userFul
             )}
           </section>
         ) : null}
-      </main>
-    </div>
+      </>
   )
 }

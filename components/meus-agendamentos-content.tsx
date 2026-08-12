@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Calendar, Clock, User, X } from "lucide-react"
+import { Calendar, Clock, User, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cancelAppointment } from "@/app/actions/appointments"
@@ -63,21 +63,10 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="text-xl font-bold text-foreground">Meus Agendamentos</h1>
-          </div>
-        </div>
-      </header>
+    <div>
+      <h1 className="text-2xl font-semibold text-foreground mb-6">Meus Agendamentos</h1>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {localAppointments.length === 0 ? (
+      {localAppointments.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-foreground mb-2">
@@ -196,7 +185,6 @@ export function MeusAgendamentosContent({ appointments }: MeusAgendamentosConten
             )}
           </div>
         )}
-      </main>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import { getServiceBySlug } from "@/app/actions/services"
 import { getAvailableBarbers } from "@/app/actions/appointments"
 import { getRoleScope } from "@/app/actions/rbac"
@@ -11,13 +10,6 @@ interface AgendarPageProps {
 
 export default async function AgendarPage({ params }: AgendarPageProps) {
   const { servico } = await params
-  
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
 
   const scope = await getRoleScope()
   if (scope.role === "admin" || scope.role === "super_admin") {

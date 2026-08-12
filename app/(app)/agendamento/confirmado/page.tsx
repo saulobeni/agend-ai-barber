@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button"
 
 export default function AgendamentoConfirmadoPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="flex items-center justify-center py-12">
       <div className="max-w-md w-full text-center">
-        <div className="bg-card border border-border rounded-xl p-8">
+        <div className="bg-card border border-border rounded-xl p-8 shadow-sm">
           <div className="bg-green-500/10 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>

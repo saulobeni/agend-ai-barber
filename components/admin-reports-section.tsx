@@ -43,9 +43,9 @@ function BarTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div style={{ background:"hsl(var(--card))", border:"1px solid hsl(var(--border))", borderRadius:8, padding:"8px 12px", fontSize:13 }}>
-      <p style={{ fontWeight:600, color:"hsl(var(--foreground))", marginBottom:2 }}>{d.fullName}</p>
-      <p style={{ color:"hsl(var(--muted-foreground))" }}>{d.pedidos} pedido(s)</p>
+    <div style={{ background:"var(--card)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", fontSize:13 }}>
+      <p style={{ fontWeight:600, color:"var(--foreground)", marginBottom:2 }}>{d.fullName}</p>
+      <p style={{ color:"var(--muted-foreground)" }}>{d.pedidos} pedido(s)</p>
     </div>
   )
 }
@@ -53,10 +53,10 @@ function BarTooltip({ active, payload }: any) {
 function LineTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background:"hsl(var(--card))", border:"1px solid hsl(var(--border))", borderRadius:8, padding:"8px 12px", fontSize:13 }}>
-      <p style={{ fontWeight:600, color:"hsl(var(--foreground))", marginBottom:4 }}>{label}</p>
+    <div style={{ background:"var(--card)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", fontSize:13 }}>
+      <p style={{ fontWeight:600, color:"var(--foreground)", marginBottom:4 }}>{label}</p>
       {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color:"hsl(var(--muted-foreground))" }}>
+        <p key={p.dataKey} style={{ color:"var(--muted-foreground)" }}>
           {p.dataKey === "revenue" ? formatCurrency(p.value) : `${p.value} agend.`}
         </p>
       ))}

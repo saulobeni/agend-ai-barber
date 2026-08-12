@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, KeyRound, LogOut, UserCircle } from "lucide-react"
+import { useTheme } from "next-themes"
+import { ChevronDown, KeyRound, LogOut, Moon, Sun, UserCircle } from "lucide-react"
 import { signOut, changePassword } from "@/app/actions/auth"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,9 @@ import { Label } from "@/components/ui/label"
 interface UserProfileMenuProps {
   userEmail?: string
   userFullName?: string | null
+  align?: "start" | "center" | "end"
+  side?: "top" | "right" | "bottom" | "left"
+  className?: string
 }
 
 function getInitials(fullName?: string | null, email?: string): string {
@@ -42,11 +46,19 @@ function getInitials(fullName?: string | null, email?: string): string {
   return "U"
 }
 
-export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProps) {
+export function UserProfileMenu({ userEmail, userFullName, align = "end", side = "bottom", className }: UserProfileMenuProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [passwordError, setPasswordError] = useState("")
   const [passwordSuccess, setPasswordSuccess] = useState("")
   const [passwordLoading, setPasswordLoading] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isDark = mounted && resolvedTheme === "dark"
 
   const displayName = userFullName?.trim() || userEmail || "Usuario"
   const initials = getInitials(userFullName, userEmail)
@@ -91,7 +103,10 @@ export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProp
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={
+              className ??
+              "flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            }
             aria-label="Menu do perfil"
           >
             <Avatar className="size-8">
@@ -106,7 +121,7 @@ export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProp
           </button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align={align} side={side} className="w-56">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">{displayName}</p>
@@ -131,6 +146,16 @@ export function UserProfileMenu({ userEmail, userFullName }: UserProfileMenuProp
           >
             <KeyRound className="size-4" />
             Alterar Senha
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault()
+              setTheme(isDark ? "light" : "dark")
+            }}
+            className="cursor-pointer"
+          >
+            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {isDark ? "Tema claro" : "Tema escuro"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
