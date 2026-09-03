@@ -1,42 +1,27 @@
--- Inserir barbearia padrão
-INSERT INTO barbershops (id, name, address, phone, opening_time, closing_time)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'AgendAI Barber',
-  'Rua Principal, 123 - Centro',
-  '(11) 99999-9999',
-  '09:00',
-  '19:00'
-) ON CONFLICT (id) DO NOTHING;
+-- =========================================================
+-- SEED: barbearia demo + serviços padrão
+-- Corrigido: as colunas `phone` (barbershops) e `icon`/`is_active`
+-- (services) nunca existiram no schema real (ver 001_create_schema.sql),
+-- por isso a versão anterior deste script sempre falhava.
+-- Idempotente por nome, então é seguro rodar mais de uma vez.
+-- =========================================================
 
--- Inserir serviços padrão
-INSERT INTO services (barbershop_id, name, description, duration_minutes, price, icon, is_active)
-VALUES 
-  (
-    '00000000-0000-0000-0000-000000000001',
-    'Corte',
-    'Corte masculino moderno com acabamento preciso e estilização personalizada.',
-    45,
-    45.00,
-    'scissors',
-    true
-  ),
-  (
-    '00000000-0000-0000-0000-000000000001',
-    'Barba',
-    'Aparar e modelar barba com toalha quente e produtos premium.',
-    30,
-    30.00,
-    'razor',
-    true
-  ),
-  (
-    '00000000-0000-0000-0000-000000000001',
-    'Combo',
-    'Corte + Barba completos com tratamento VIP e finalização impecável.',
-    60,
-    65.00,
-    'combo',
-    true
-  )
-ON CONFLICT DO NOTHING;
+DO $$
+DECLARE
+  demo_shop_id UUID;
+BEGIN
+  SELECT id INTO demo_shop_id FROM public.barbershops WHERE name = 'AgendAI Barber' LIMIT 1;
+
+  IF demo_shop_id IS NULL THEN
+    INSERT INTO public.barbershops (name, address, opening_time, closing_time)
+    VALUES ('AgendAI Barber', 'Rua Principal, 123 - Centro', '09:00', '19:00')
+    RETURNING id INTO demo_shop_id;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.services WHERE barbershop_id = demo_shop_id) THEN
+    INSERT INTO public.services (barbershop_id, name, description, duration_minutes, price) VALUES
+      (demo_shop_id, 'Corte', 'Corte masculino moderno com acabamento preciso e estilização personalizada.', 45, 45.00),
+      (demo_shop_id, 'Barba', 'Aparar e modelar barba com toalha quente e produtos premium.', 30, 30.00),
+      (demo_shop_id, 'Combo', 'Corte + Barba completos com tratamento VIP e finalização impecável.', 60, 65.00);
+  END IF;
+END $$;
