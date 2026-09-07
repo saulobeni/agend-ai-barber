@@ -363,6 +363,11 @@ export async function createAppointment(data: {
 
   if (error || !appointment) {
     console.error('Error creating appointment:', error)
+    // 23P01 = exclusion_violation (sobreposição de horário travada pelo banco)
+    // 23505 = unique_violation
+    if (error?.code === '23P01' || error?.code === '23505') {
+      return { success: false, error: 'Este horário acabou de ser reservado para este profissional. Escolha outro horário.' }
+    }
     return { success: false, error: 'Erro ao criar agendamento' }
   }
 
