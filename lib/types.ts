@@ -57,9 +57,39 @@ export interface Appointment {
   status: AppointmentStatus
   cancel_token: string
   created_at: string
+  base_price?: number | null
+  discount_amount?: number | null
+  final_price?: number | null
+  coupon_id?: string | null
   service?: Service
   barber?: Barber
   client?: Client
+}
+
+export type DiscountType = 'percentage' | 'fixed'
+export type CouponTriggerType = 'manual_code' | 'off_peak' | 'loyalty' | 'retention'
+
+export interface Coupon {
+  id: string
+  barbershop_id: string
+  name: string
+  description: string | null
+  code: string | null
+  trigger_type: CouponTriggerType
+  discount_type: DiscountType
+  discount_value: number
+  min_service_value: number
+  max_discount_amount: number | null
+  max_uses_global: number | null
+  max_uses_per_client: number | null
+  valid_days_of_week: number[] | null
+  valid_time_start: string | null
+  valid_time_end: string | null
+  target_service_id: string | null
+  starts_at: string | null
+  expires_at: string | null
+  is_active: boolean
+  created_at: string
 }
 
 export interface BlockedTime {

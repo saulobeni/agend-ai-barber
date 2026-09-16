@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Calendar, Clock, Scissors } from "lucide-react"
+import { Calendar, Clock, Scissors, Tag, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { createAppointment, getAvailableTimes } from "@/app/actions/appointments"
+import { validateCoupon } from "@/app/actions/coupons"
 import type { Service, Barber } from "@/lib/types"
+
+interface AppliedCoupon {
+  id: string
+  code: string
+  discountAmount: number
+  finalPrice: number
+}
 
 interface AgendarContentProps {
   service: Service
@@ -72,6 +81,11 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  const [cupomCodigo, setCupomCodigo] = useState("")
+  const [cupomAplicado, setCupomAplicado] = useState<AppliedCoupon | null>(null)
+  const [cupomErro, setCupomErro] = useState("")
+  const [cupomValidando, setCupomValidando] = useState(false)
+
   const diasCalendario = gerarCalendario(anoAtual, mesAtual)
 
   // Buscar horários quando selecionar dia e barbeiro
@@ -128,6 +142,42 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
     return `${dia}/${mes}/${anoAtual}`
   }
 
+  const handleAplicarCupom = async () => {
+    const codigo = cupomCodigo.trim()
+    if (!codigo) return
+
+    setCupomValidando(true)
+    setCupomErro("")
+
+    const result = await validateCoupon({
+      code: codigo,
+      barbershopId: service.barbershop_id,
+      serviceId: service.id,
+    })
+
+    if (result.valid && result.coupon) {
+      setCupomAplicado({
+        id: result.coupon.id,
+        code: result.coupon.code,
+        discountAmount: result.coupon.discountAmount,
+        finalPrice: result.coupon.finalPrice,
+      })
+    } else {
+      setCupomAplicado(null)
+      setCupomErro(result.error || "Cupom inválido")
+    }
+
+    setCupomValidando(false)
+  }
+
+  const handleRemoverCupom = () => {
+    setCupomAplicado(null)
+    setCupomCodigo("")
+    setCupomErro("")
+  }
+
+  const totalFinal = cupomAplicado ? cupomAplicado.finalPrice : service.price
+
   const handleConfirmar = async () => {
     if (!diaSelecionado || !horarioSelecionado || !barbeiroSelecionado) return
 
@@ -142,6 +192,7 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
       date: data,
       time: horarioSelecionado,
       duration: service.duration_minutes,
+      couponCode: cupomAplicado?.code || null,
     })
 
     if (result.success) {
@@ -341,10 +392,68 @@ export function AgendarContent({ service, barbers }: AgendarContentProps) {
               </div>
 
               <div className="border-t border-border my-4" />
-              
+
+              <div className="mb-4">
+                <label className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                  <Tag className="h-3.5 w-3.5" />
+                  Cupom de desconto
+                </label>
+
+                {cupomAplicado ? (
+                  <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+                    <span className="text-sm font-medium text-primary">{cupomAplicado.code}</span>
+                    <button
+                      onClick={handleRemoverCupom}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Remover cupom"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={cupomCodigo}
+                      onChange={(e) => {
+                        setCupomCodigo(e.target.value.toUpperCase())
+                        setCupomErro("")
+                      }}
+                      placeholder="Código do cupom"
+                      className="uppercase"
+                      disabled={cupomValidando}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAplicarCupom}
+                      disabled={!cupomCodigo.trim() || cupomValidando}
+                    >
+                      {cupomValidando ? "..." : "Aplicar"}
+                    </Button>
+                  </div>
+                )}
+
+                {cupomErro && (
+                  <p className="text-xs text-destructive mt-1.5">{cupomErro}</p>
+                )}
+              </div>
+
+              {cupomAplicado && (
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-foreground">R${service.price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Desconto</span>
+                    <span className="text-green-600">-R${cupomAplicado.discountAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-6">
                 <span className="text-muted-foreground">Total</span>
-                <span className="text-2xl font-bold text-primary">R${service.price.toFixed(0)}</span>
+                <span className="text-2xl font-bold text-primary">R${totalFinal.toFixed(2)}</span>
               </div>
 
               <Button

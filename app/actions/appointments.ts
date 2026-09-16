@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { Appointment, Barber } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { getRoleScope } from '@/app/actions/rbac'
+import { validateCouponForBooking } from '@/lib/coupons'
 
 function parseTimeToMinutes(time: string): number {
   // Supabase often returns TIME as `HH:MM:SS`, but we also accept `HH:MM`.
@@ -310,6 +311,7 @@ export async function createAppointment(data: {
   date: string
   time: string
   duration: number
+  couponCode?: string | null
 }): Promise<{ success: boolean; error?: string; appointmentId?: string }> {
   const supabase = await createClient()
 
@@ -347,6 +349,27 @@ export async function createAppointment(data: {
     return { success: false, error: 'Erro ao criar cliente' }
   }
 
+  // Revalida o cupom no servidor (nunca confiar no desconto calculado no cliente)
+  let couponId: string | null = null
+  let discountAmount = 0
+
+  const couponCode = data.couponCode?.trim()
+  if (couponCode) {
+    const couponResult = await validateCouponForBooking({
+      code: couponCode,
+      barbershopId: String(barber.barbershop_id),
+      serviceId: data.serviceId,
+      clientId: client.id,
+    })
+
+    if (!couponResult.valid || !couponResult.coupon) {
+      return { success: false, error: couponResult.error || 'Cupom inválido' }
+    }
+
+    couponId = couponResult.coupon.id
+    discountAmount = couponResult.coupon.discountAmount
+  }
+
   const { data: appointment, error } = await supabase
     .from('appointments')
     .insert({
@@ -357,6 +380,8 @@ export async function createAppointment(data: {
       appointment_date: data.date,
       appointment_time: data.time,
       status: 'scheduled',
+      coupon_id: couponId,
+      discount_amount: discountAmount,
     })
     .select('id')
     .single()
@@ -369,6 +394,21 @@ export async function createAppointment(data: {
       return { success: false, error: 'Este horário acabou de ser reservado para este profissional. Escolha outro horário.' }
     }
     return { success: false, error: 'Erro ao criar agendamento' }
+  }
+
+  if (couponId) {
+    const adminSupabase = createAdminClient()
+    const { error: usageError } = await adminSupabase.from('coupon_usages').insert({
+      coupon_id: couponId,
+      appointment_id: appointment.id,
+      client_id: client.id,
+      user_id: identity.user.id,
+      discount_applied: discountAmount,
+    })
+
+    if (usageError) {
+      console.error('Error registering coupon usage:', usageError)
+    }
   }
 
   revalidatePath('/dashboard')
