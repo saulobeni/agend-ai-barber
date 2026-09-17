@@ -23,13 +23,50 @@ export async function login(formData: FormData) {
   redirect(redirectPath)
 }
 
-export async function signup(formData: FormData) {
-  const supabase = await createClient()
+const AUTO_CONFIRM_EMAIL_DOMAIN = '@agendai.com'
 
-  const email = formData.get('email') as string
+export async function signup(formData: FormData) {
+  const email = (formData.get('email') as string || '').trim()
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
   const phone = formData.get('phone') as string
+
+  if (email.toLowerCase().endsWith(AUTO_CONFIRM_EMAIL_DOMAIN)) {
+    const adminSupabase = createAdminClient()
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        phone: phone,
+      },
+    })
+
+    if (authError || !authData.user) {
+      return { error: authError?.message || 'Erro ao criar conta' }
+    }
+
+    const { error: roleError } = await adminSupabase
+      .from('user_roles')
+      .insert({ user_id: authData.user.id, role: 'user', barbershop_id: null })
+
+    if (roleError) {
+      return { error: `Usuario criado, mas falhou ao atribuir role user: ${roleError.message}` }
+    }
+
+    const supabase = await createClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (signInError) {
+      return { error: signInError.message }
+    }
+
+    const redirectPath = await getPostLoginRedirectPath()
+    redirect(redirectPath)
+  }
+
+  const supabase = await createClient()
 
   const { data, error } = await supabase.auth.signUp({
     email,
