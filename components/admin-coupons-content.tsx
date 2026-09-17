@@ -5,7 +5,6 @@ import { toast } from "sonner"
 import {
   Ticket,
   TicketPercent,
-  Plus,
   Search,
   Copy,
   Check,
@@ -300,34 +299,16 @@ export function AdminCouponsContent({
   return (
     <div className="space-y-8 pb-12">
       {/* ── HEADER DA PÁGINA ── */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Cupons</h1>
-            <Badge variant="outline" className="border-primary/40 text-primary bg-primary/10">
-              Admin
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {barbershop ? barbershop.name : "Barbearia"} {userEmail ? `• ${userEmail}` : ""}
-          </p>
-        </div>
-
+      <div>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const formEl = document.getElementById("cadastro-cupom-card")
-              formEl?.scrollIntoView({ behavior: "smooth" })
-            }}
-            className="gap-2"
-          >
-            <Plus className="size-4" />
-            Criar Novo Cupom
-          </Button>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Cupons</h1>
+          <Badge variant="outline" className="border-primary/40 text-primary bg-primary/10">
+            Admin
+          </Badge>
         </div>
+        <p className="text-sm text-muted-foreground">
+          {barbershop ? barbershop.name : "Barbearia"} {userEmail ? `• ${userEmail}` : ""}
+        </p>
       </div>
 
       {/* ── CARDS DE MÉTRICAS (KPIs) ── */}
