@@ -1,0 +1,7 @@
+-- =========================================================
+-- Este script foi consolidado em 002_seed_data.sql (mesma seed:
+-- barbearia demo "AgendAI Barber" + 3 serviços padrão).
+-- A versão original aqui referenciava `services.icon`, coluna que
+-- nunca existiu no schema real, e por isso sempre falhava.
+-- Mantido como no-op apenas para preservar a numeração da sequência.
+-- =========================================================
