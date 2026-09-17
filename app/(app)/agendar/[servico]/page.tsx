@@ -25,7 +25,7 @@ export default async function AgendarPage({ params }: AgendarPageProps) {
     redirect("/dashboard")
   }
 
-  const barbers = await getAvailableBarbers(service.barbershop_id)
+  const barbers = await getAvailableBarbers(service.barbershop_id, service.id)
 
   return (
     <AgendarContent 

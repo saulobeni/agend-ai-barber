@@ -44,6 +44,20 @@ export interface Service {
   created_at: string
 }
 
+export interface BarberService {
+  id: string
+  barber_id: string
+  service_id: string
+  created_at: string
+}
+
+// Para telas administrativas: barbeiro + lista de service_ids vinculados.
+export interface AdminBarberServiceItem {
+  barber_id: string
+  barber_name: string
+  service_ids: string[]
+}
+
 export type AppointmentStatus = 'scheduled' | 'completed' | 'canceled'
 
 export interface Appointment {

@@ -195,8 +195,24 @@ async function getOrCreateClientForBarbershop(data: {
   return { id: String(createdClient.id) }
 }
 
-export async function getAvailableBarbers(barbershopId?: string): Promise<Barber[]> {
+export async function getAvailableBarbers(barbershopId?: string, serviceId?: string): Promise<Barber[]> {
   const supabase = await createClient()
+
+  let allowedBarberIds: string[] | null = null
+  if (serviceId) {
+    const { data: links, error: linksError } = await supabase
+      .from('barber_services')
+      .select('barber_id')
+      .eq('service_id', serviceId)
+
+    if (linksError) {
+      console.error('Error fetching barber_services:', linksError)
+      return []
+    }
+
+    allowedBarberIds = (links || []).map((l: any) => l.barber_id)
+    if (allowedBarberIds.length === 0) return []
+  }
 
   let query = supabase
     .from('barbers')
@@ -208,6 +224,10 @@ export async function getAvailableBarbers(barbershopId?: string): Promise<Barber
   } else {
     const ownedIds = await getScopedBarbershopIds()
     if (ownedIds.length > 0) query = query.in('barbershop_id', ownedIds)
+  }
+
+  if (allowedBarberIds) {
+    query = query.in('id', allowedBarberIds)
   }
 
   const { data, error } = await query
