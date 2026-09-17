@@ -92,6 +92,12 @@ export interface Coupon {
   created_at: string
 }
 
+export interface AdminCouponItem extends Coupon {
+  totalUses: number
+  totalDiscountApplied: number
+  target_service_name?: string | null
+}
+
 export interface BlockedTime {
   id: string
   barber_id: string

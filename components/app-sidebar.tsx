@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Calendar, LayoutDashboard, Scissors } from "lucide-react"
+import { Calendar, LayoutDashboard, Scissors, TicketPercent } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -35,7 +35,10 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { title: "Meus Agendamentos", href: "/meus-agendamentos", icon: Calendar },
   ],
   barber: [{ title: "Agenda", href: "/dashboard", icon: Calendar }],
-  admin: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+  admin: [
+    { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { title: "Cupons", href: "/cupons", icon: TicketPercent },
+  ],
   super_admin: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
 }
 
