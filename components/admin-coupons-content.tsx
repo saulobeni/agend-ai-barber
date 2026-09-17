@@ -182,7 +182,7 @@ export function AdminCouponsContent({
         const refreshedCode = (formData.get("code") as string) || "NOVO"
         setCoupons((prev) => [
           {
-            id: `temp-${Date.now()}`,
+            id: res.couponId || `temp-${Date.now()}`,
             barbershop_id: barbershop?.id || "",
             name: (formData.get("name") as string) || "",
             code: refreshedCode,

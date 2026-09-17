@@ -166,7 +166,7 @@ export async function getAdminCouponsData(): Promise<{
   }
 }
 
-export async function createCouponByAdmin(formData: FormData): Promise<ActionResult> {
+export async function createCouponByAdmin(formData: FormData): Promise<ActionResult & { couponId?: string }> {
   const check = await requireAdminScope()
   if (!check.scope || !check.barbershopId) return check.error as ActionResult
 
@@ -241,35 +241,39 @@ export async function createCouponByAdmin(formData: FormData): Promise<ActionRes
     return { success: false, error: 'Já existe um cupom com este código nesta barbearia' }
   }
 
-  const { error } = await supabase.from('coupons').insert({
-    barbershop_id: check.barbershopId,
-    name,
-    code: rawCode,
-    description,
-    trigger_type: 'manual_code',
-    discount_type: discountType,
-    discount_value: discountValue,
-    min_service_value: minServiceValue,
-    max_discount_amount: maxDiscountAmount,
-    max_uses_global: maxUsesGlobal,
-    max_uses_per_client: maxUsesPerClient,
-    target_service_id: targetServiceId,
-    starts_at: startsAt,
-    expires_at: expiresAt,
-    is_active: isActive,
-  })
+  const { data: created, error } = await supabase
+    .from('coupons')
+    .insert({
+      barbershop_id: check.barbershopId,
+      name,
+      code: rawCode,
+      description,
+      trigger_type: 'manual_code',
+      discount_type: discountType,
+      discount_value: discountValue,
+      min_service_value: minServiceValue,
+      max_discount_amount: maxDiscountAmount,
+      max_uses_global: maxUsesGlobal,
+      max_uses_per_client: maxUsesPerClient,
+      target_service_id: targetServiceId,
+      starts_at: startsAt,
+      expires_at: expiresAt,
+      is_active: isActive,
+    })
+    .select('id')
+    .single()
 
-  if (error) {
+  if (error || !created) {
     console.error('Error creating coupon:', error)
-    if (error.code === '23505') {
+    if (error?.code === '23505') {
       return { success: false, error: 'Já existe um cupom com este código nesta barbearia' }
     }
-    return { success: false, error: error.message || 'Erro ao cadastrar cupom' }
+    return { success: false, error: error?.message || 'Erro ao cadastrar cupom' }
   }
 
   revalidatePath('/cupons')
   revalidatePath('/dashboard')
-  return { success: true }
+  return { success: true, couponId: String(created.id) }
 }
 
 export async function updateCouponByAdmin(formData: FormData): Promise<ActionResult> {
