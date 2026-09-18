@@ -2,13 +2,24 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Calendar, LayoutDashboard, Link2, Scissors, TicketPercent } from "lucide-react"
+import {
+  Calendar,
+  ClipboardList,
+  LayoutDashboard,
+  Link2,
+  Scissors,
+  Store,
+  TicketPercent,
+  UserCog,
+  Users,
+} from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -29,23 +40,59 @@ interface NavItem {
   icon: typeof LayoutDashboard
 }
 
-const navByRole: Record<UserRole, NavItem[]> = {
+interface NavGroup {
+  label?: string
+  items: NavItem[]
+}
+
+const navByRole: Record<UserRole, NavGroup[]> = {
   user: [
-    { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { title: "Meus Agendamentos", href: "/meus-agendamentos", icon: Calendar },
+    {
+      items: [
+        { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+        { title: "Meus Agendamentos", href: "/meus-agendamentos", icon: Calendar },
+      ],
+    },
   ],
-  barber: [{ title: "Agenda", href: "/dashboard", icon: Calendar }],
+  barber: [
+    {
+      items: [{ title: "Agenda", href: "/dashboard", icon: Calendar }],
+    },
+  ],
   admin: [
-    { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { title: "Cupons", href: "/cupons", icon: TicketPercent },
-    { title: "Serviços por Barbeiro", href: "/servicos-por-barbeiro", icon: Link2 },
+    { label: "Visão Geral", items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }] },
+    {
+      label: "Operação",
+      items: [
+        { title: "Cupons", href: "/cupons", icon: TicketPercent },
+        { title: "Serviços por Barbeiro", href: "/servicos-por-barbeiro", icon: Link2 },
+      ],
+    },
+    {
+      label: "Gestão",
+      items: [
+        { title: "Usuários", href: "/usuarios", icon: Users },
+        { title: "Serviços", href: "/servicos", icon: ClipboardList },
+        { title: "Barbeiros", href: "/barbeiros", icon: UserCog },
+      ],
+    },
   ],
-  super_admin: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+  super_admin: [
+    { label: "Visão Geral", items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }] },
+    {
+      label: "Gestão",
+      items: [
+        { title: "Barbearias", href: "/barbearias", icon: Store },
+        { title: "Usuários", href: "/usuarios", icon: Users },
+        { title: "Barbeiros", href: "/barbeiros", icon: UserCog },
+      ],
+    },
+  ],
 }
 
 export function AppSidebar({ role, userEmail, userFullName }: AppSidebarProps) {
   const pathname = usePathname()
-  const items = navByRole[role] ?? navByRole.user
+  const groups = navByRole[role] ?? navByRole.user
 
   return (
     <Sidebar collapsible="icon">
@@ -69,22 +116,25 @@ export function AppSidebar({ role, userEmail, userFullName }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map((group, index) => (
+          <SidebarGroup key={group.label ?? index}>
+            {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

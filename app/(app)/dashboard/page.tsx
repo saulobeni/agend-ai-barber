@@ -34,10 +34,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const [{ metrics, topServices, monthlyData, barbershops }, profile, management] = await Promise.all([
       getReportData(selectedBarbershopId, reportDateRange),
       getProfile(),
-      (scope.role === 'admin' || scope.isSuperAdmin)
+      scope.isSuperAdmin
         ? getAdminManagementData()
-        : Promise.resolve({ roles: [], barbers: [], services: [], users: [] }),
+        : Promise.resolve({ roles: [], barbers: [], services: [], barbershops: [], users: [] }),
     ])
+
+    const overviewStats = scope.isSuperAdmin
+      ? {
+          totalShops: management.barbershops.length,
+          activeShops: management.barbershops.filter((b: any) => b.is_active !== false).length,
+          totalAdmins: management.users.filter((u: any) => u.role === 'admin').length,
+          totalBarbers: management.barbers.length,
+        }
+      : undefined
 
     return (
       <AdminDashboardContent
@@ -51,10 +60,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         reportEndDate={reportDateRange?.endDate}
         selectedBarbershopId={selectedBarbershopId}
         barbershops={barbershops}
-        roles={management.roles}
-        services={management.services}
-        users={management.users}
-        canManageRoles={scope.role === 'admin' || scope.isSuperAdmin}
+        overviewStats={overviewStats}
       />
     )
   }

@@ -27,12 +27,12 @@ async function resolveTargetBarbershopId(inputBarbershopId?: string): Promise<st
 export async function getAdminManagementData() {
   const scope = await getRoleScope()
   if (scope.role !== 'admin' && scope.role !== 'super_admin') {
-    return { roles: [], barbers: [], services: [], barbershops: [] }
+    return { roles: [], barbers: [], services: [], barbershops: [], users: [] }
   }
 
   const scopedIds = scope.barbershopIds
   if (scopedIds.length === 0) {
-    return { roles: [], barbers: [], services: [], barbershops: [] }
+    return { roles: [], barbers: [], services: [], barbershops: [], users: [] }
   }
 
   const supabase = await createClient()
@@ -56,7 +56,7 @@ export async function getAdminManagementData() {
         .order('created_at', { ascending: false }),
       supabase
         .from('barbershops')
-        .select('id, owner_id, name, address, opening_time, closing_time, created_at')
+        .select('id, owner_id, name, address, opening_time, closing_time, is_active, created_at')
         .in('id', scopedIds)
         .order('name', { ascending: true }),
     ])
